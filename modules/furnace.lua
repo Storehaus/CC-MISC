@@ -22,6 +22,7 @@ return {
     },
     ---@param loaded {crafting: modules.crafting, logger: modules.logger|nil, inventory: modules.inventory}
     init = function(loaded, config)
+        local log = loaded.logger
         local crafting = loaded.crafting.interface.recipeInterface
         ---@type table<string,string> output->input
         local recipes = {}
@@ -162,8 +163,8 @@ return {
                         local toAssign = node.multiple
                         local fuelNeeded = math.floor(toAssign / node.multiple)
                         local absFurnace = require("abstractInvLib")({ attachedFurnaces[furnace] })
-                        local fmoved = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelNeeded, 2)
-                        local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign,
+                        local fmoved = loaded.inventory.interface.pushItems(absFurnace, node.fuel, fuelNeeded, 2)
+                        local moved = loaded.inventory.interface.pushItems(absFurnace, node.ingredient, toAssign,
                             1)
                         node.smelting[attachedFurnaces[furnace]] = (node.smelting[furnace] or 0) + toAssign - moved
                         node.fuelNeeded[attachedFurnaces[furnace]] = (node.fuelNeeded[furnace] or 0) + fuelNeeded -
@@ -194,28 +195,37 @@ return {
         end
         crafting.addCraftingHandler("furnace", craftingHandler)
 
+        local checkNodeFurnacesLog = setmetatable({}, {
+            __index = function()
+                return function()
+                end
+            end
+        })
+        if log and config.inventory.logAIL.value then
+            checkNodeFurnacesLog = loaded.logger.interface.logger("furnace", "checkNodeFurnaces")
+        end
         ---@param node FurnaceNode
         local function checkNodeFurnaces(node)
             for furnace, remaining in pairs(node.smelting) do
                 local absFurnace = require("abstractInvLib")({ furnace })
-                local crafted = loaded.inventory.interface.pullItems(false, absFurnace, 3)
+                local crafted = loaded.inventory.interface.pullItems(absFurnace, 3)
                 node.done = node.done + crafted
                 if config.furnace.fuels.value[node.fuel].bucket and node.hasBucket then
-                    local i = loaded.inventory.interface.pullItems(false, absFurnace, 2)
+                    local i = loaded.inventory.interface.pullItems(absFurnace, 2)
                     if i > 0 then
                         node.hasBucket = false
                     end
                 end
                 if remaining > 0 then
-                    local amount = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, remaining, 1)
+                    local amount = loaded.inventory.interface.pushItems(absFurnace, node.ingredient, remaining, 1)
                     node.smelting[furnace] = remaining - amount
                 end
                 if node.fuelNeeded[furnace] > 0 then
-                    local famount = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel,
+                    local famount = loaded.inventory.interface.pushItems(absFurnace, node.fuel,
                         node.fuelNeeded[furnace], 2)
                     if famount == 0 and config.furnace.fuels.value[node.fuel].bucket then
                         -- remove the bucket
-                        loaded.inventory.interface.pullItems(true, absFurnace, 2)
+                        loaded.inventory.interface.pullItems(absFurnace, 2)
                     end
                     node.fuelNeeded[furnace] = node.fuelNeeded[furnace] - famount
                 end

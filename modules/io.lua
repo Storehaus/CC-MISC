@@ -27,13 +27,13 @@ return {
     local function dumbImport(periph, slots, rule)
       if not periph.list then
         for _, slot in ipairs(slots) do
-          loaded.inventory.interface.pullItems(true, rule.inventory, slot)
+          loaded.inventory.interface.queuePull(rule.inventory, slot)
         end
       else
         local list = periph.list()
         for _, slot in ipairs(slots) do
           if list[slot] then
-            loaded.inventory.interface.pullItems(true, rule.inventory, slot)
+            loaded.inventory.interface.queuePull(rule.inventory, slot)
           end
         end
       end
@@ -60,10 +60,10 @@ return {
           local moved
           local name = list[slot].name
           if wllut and wllut[name] then
-            loaded.inventory.interface.pullItems(true, rule.inventory, slot)
+            loaded.inventory.interface.queuePull(rule.inventory, slot)
             moved = true
           elseif not (wllut or bllut[name]) then
-            loaded.inventory.interface.pullItems(true, rule.inventory, slot)
+            loaded.inventory.interface.queuePull(rule.inventory, slot)
             moved = true
           end
           if remaining and moved then
@@ -119,10 +119,10 @@ return {
           if remaining < 1 then
             return
           end
-          local moved = loaded.inventory.interface.pushItems(false, rule.inventory, rule.name, remaining, slot, rule.nbt)
+          local moved = loaded.inventory.interface.pushItems(rule.inventory, rule.name, remaining, slot, rule.nbt)
           remaining = remaining - moved
         else
-          loaded.inventory.interface.pushItems(true, rule.inventory, rule.name, nil, slot, rule.nbt)
+          loaded.inventory.interface.pushItems(rule.inventory, rule.name, nil, slot, rule.nbt)
         end
       end
     end

@@ -100,159 +100,11 @@ return {
         end
       end
     })
-    if log then
+    if log and config.inventory.logAIL.value then
       ailLogger = loaded.logger.interface.logger("inventory", "abstractInvLib")
     end
-    ailLogger = config.inventory.logAIL.value and ailLogger
     local storage = require("abstractInvLib")(inventories, nil, { redirect = function(s) ailLogger:debug(s) end })
     storage.setBatchLimit(config.inventory.executeLimit.value)
-    local transferQueue = {}
-    local transferTimer
-    local inventoryLock = false
-
-    ---Signal the system to perform a transfer
-    local function performTransfer()
-      if transferTimer then
-        os.cancelTimer(transferTimer)
-        transferTimer = nil
-      end
-      os.queueEvent("_performTransfer")
-    end
-
-    local function defrag()
-      inventoryLock = true
-      storage.defrag()
-      inventoryLock = false
-    end
-
-    ---Queue handling function
-    ---Waits to do an optimal transfer of the whole queue
-    local function queueHandler()
-      local logger = setmetatable({}, {
-        __index = function()
-          return function()
-          end
-        end
-      })
-      if log then
-        logger = loaded.logger.interface.logger("inventory", "queueHandler")
-      end
-      if #transferQueue > 0 then
-        performTransfer()
-      end
-      while true do
-        os.pullEvent("_performTransfer")
-        if transferTimer then
-          os.cancelTimer(transferTimer)
-          transferTimer = nil
-        end
-        while inventoryLock do
-          os.sleep(0)
-        end
-        if logger then
-          logger:debug("Starting transfer")
-        end
-        local transferQueueCopy = { table.unpack(transferQueue) }
-        transferQueue = {}
-        for _, v in pairs(transferQueueCopy) do
-          local transfer = v
-          logger:debug("Transfer %s %s %s %s %s %s %s %s", table.unpack(transfer))
-          local retVal = table.pack(pcall(function() return storage[transfer[2]](table.unpack(transfer, 3, transfer.n)) end))
-          if not retVal[1] then
-            logger:error("Transfer %s %s failed with %s", transfer[1], transfer[2], retVal[2])
-            error(retVal[2])
-          end
-          logger:debug("Transfer %s %s finished, returned %s", transfer[1], transfer[2], retVal[2])
-          os.queueEvent("inventoryFinished", transfer[1], table.unpack(retVal, 2))
-        end
-        if config.inventory.defragEachTransfer.value then
-          defrag()
-        end
-        os.queueEvent("inventoryUpdate", storage.list())
-        if #transferQueue > 0 then
-          performTransfer()
-        end
-      end
-    end
-
-    ---Handles timers
-    local function timerHandler()
-      while true do
-        local e, id = os.pullEvent("timer")
-        if id == transferTimer then
-          performTransfer()
-        end
-      end
-    end
-
-    ---Add the given arguments to the queue
-    ---@param id string
-    ---@param ... any
-    local function addToQueue(id, ...)
-      table.insert(transferQueue, table.pack(id, ...))
-      if (#transferQueue > config.inventory.flushLimit.value) then
-        performTransfer()
-      elseif not transferTimer then
-        transferTimer = os.startTimer(config.inventory.flushTimer.value)
-      end
-    end
-
-    ---Generate a pseudo random ID
-    ---@return string
-    local function getID()
-      return tostring({})
-    end
-
-    ---Add the given arguments to the queue, generating an id
-    ---@param ... any
-    ---@return string
-    local function queueAction(...)
-      local id = getID()
-      addToQueue(id, ...)
-      return id
-    end
-
-    local function waitForTransfer(id)
-      local e
-      repeat
-        e = { os.pullEvent("inventoryFinished") }
-      until e[2] == id
-      return e
-    end
-
-    ---Push items to an inventory
-    ---@param async boolean|nil
-    ---@param targetInventory string|AbstractInventory|Inventory
-    ---@param name string|number
-    ---@param amount nil|number
-    ---@param toSlot nil|number
-    ---@param nbt nil|string
-    ---@param options nil|TransferOptions
-    ---@return integer|string count event name in case of async
-    local function pushItems(async, targetInventory, name, amount, toSlot, nbt, options)
-      if async then
-        return queueAction("pushItems", targetInventory, name, amount, toSlot, nbt, options)
-      end
-      performTransfer()
-      return storage.pushItems(targetInventory, name, amount, toSlot, nbt, options)
-    end
-
-    ---Pull items from an inventory
-    ---@param async boolean|nil
-    ---@param fromInventory string|AbstractInventory|Inventory
-    ---@param fromSlot string|number
-    ---@param amount nil|number
-    ---@param toSlot nil|number
-    ---@param nbt nil|string
-    ---@param options nil|TransferOptions
-    ---@return integer|string count event name in case of async
-    local function pullItems(async, fromInventory, fromSlot, amount, toSlot, nbt, options)
-      if async then
-        return queueAction("pullItems", fromInventory, fromSlot, amount, toSlot, nbt, options)
-      end
-      performTransfer()
-      return storage.pullItems(fromInventory, fromSlot, amount, toSlot, nbt, options)
-    end
 
     if config.inventory.defragOnStart.value then
       print("Defragmenting...")
@@ -269,27 +121,7 @@ return {
         module[k] = v
       end
     end
-    module.pushItems = pushItems
-    module.pullItems = pullItems
-    module.defrag = defrag
-    module.start = function()
-      parallel.waitForAny(queueHandler, timerHandler)
-    end
-    module.gui = function(frame)
-      frame:addLabel():setPosition(2, 2):setText("Transfer Queue Length:")
-      local queueSizeLabel = frame:addLabel():setPosition(2, 3):setFontSize(3)
-      frame:addButton():setPosition(2, 11):setSize("parent.w-2", 3):setText("Flush Queue"):onClick(performTransfer)
-      frame:addButton():setPosition(2, 15):setSize("parent.w-2", 3):setText("Clear Queue"):onClick(function()
-        transferQueue = {}
-      end)
-      frame:addThread():start(function()
-        while true do
-          os.pullEvent()
-          queueSizeLabel:setText(#transferQueue)
-        end
-      end)
-    end
-    module.performTransfer = performTransfer
+    module.start = storage.run
 
     return module
   end,

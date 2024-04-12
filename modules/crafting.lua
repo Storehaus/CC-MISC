@@ -701,7 +701,7 @@ return {
       common.enforceType(slot, 4, "integer")
       local failCount = 0
       while toMove > 0 do
-        local transfered = loaded.inventory.interface.pushItems(false, to, name, toMove, slot, nil, { optimal = false })
+        local transfered = loaded.inventory.interface.pushItems(to, name, toMove, slot, nil, { optimal = false })
         toMove = toMove - transfered
         if transfered == 0 then
           failCount = failCount + 1

@@ -206,7 +206,7 @@ return {
     local function emptyTurtle(turtle)
       local ids = {}
       for _, slot in pairs(turtle.itemSlots) do
-        ids[loaded.inventory.interface.pullItems(true, turtle.name, slot)] = true
+        ids[loaded.inventory.interface.queuePull(turtle.name, slot)] = true
       end
       repeat
         local e = { os.pullEvent("inventoryFinished") }

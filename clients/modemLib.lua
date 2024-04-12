@@ -82,27 +82,25 @@ local function interface(method, ...)
   end
 end
 ---Pull items from an inventory
----@param async boolean
 ---@param fromInventory string|AbstractInventory
 ---@param fromSlot string|number
 ---@param amount nil|number
 ---@param toSlot nil|number
 ---@param nbt nil|string
 ---@param options nil|TransferOptions
-function lib.pullItems(async, fromInventory, fromSlot, amount, toSlot, nbt, options)
-  return interface("pullItems", async, fromInventory, fromSlot, amount, toSlot, nbt, options)
+function lib.pullItems(fromInventory, fromSlot, amount, toSlot, nbt, options)
+  return interface("pullItems", fromInventory, fromSlot, amount, toSlot, nbt, options)
 end
 
 ---Push items to an inventory
----@param async boolean
 ---@param targetInventory string
 ---@param name string|number
 ---@param amount nil|number
 ---@param toSlot nil|number
 ---@param nbt nil|string
 ---@param options nil|TransferOptions
-function lib.pushItems(async, targetInventory, name, amount, toSlot, nbt, options)
-  return interface("pushItems", async, targetInventory, name, amount, toSlot, nbt, options)
+function lib.pushItems(targetInventory, name, amount, toSlot, nbt, options)
+  return interface("pushItems", targetInventory, name, amount, toSlot, nbt, options)
 end
 
 ---List inventory contents
@@ -124,10 +122,6 @@ function lib.subscribe()
       os.queueEvent("update", event.message.list)
     end
   end
-end
-
-function lib.performTransfer()
-  return interface("performTransfer")
 end
 
 function lib.listCraftables()
