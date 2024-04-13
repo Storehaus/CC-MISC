@@ -3,7 +3,7 @@ local common = require("common")
 ---@field interface modules.crafting.interface
 return {
   id = "crafting",
-  version = "1.4.1",
+  version = "2.0.0",
   config = {
     tagLookup = {
       type = "table",
@@ -29,7 +29,7 @@ return {
   },
   dependencies = {
     logger = { min = "1.1", optional = true },
-    inventory = { min = "1.1" }
+    inventory = { min = "2.0" }
   },
   init = function(loaded, config)
     local log = loaded.logger
@@ -946,23 +946,23 @@ return {
       inventoryTransferLogger = log.interface.logger("crafting", "inventory_transfer_listener")
     end
     local function inventoryTransferListener()
-      while true do
-        local _, transferId = os.pullEvent("inventoryFinished")
-        ---@type CraftingNode
-        local node = transferIdTaskLUT[transferId]
-        if node then
-          transferIdTaskLUT[transferId] = nil
-          removeFromArray(node.transfers, transferId)
-          if #node.transfers == 0 then
-            if log then
-              inventoryTransferLogger:debug("Node DONE, taskId:%s, jobId:%s", node.taskId, node.jobId)
-            end
-            -- all transfers finished
-            changeNodeState(node, "DONE")
-            tickNode(node)
-          end
-        end
-      end
+      -- while true do
+      --   local _, transferId = os.pullEvent("inventoryFinished")
+      --   ---@type CraftingNode
+      --   local node = transferIdTaskLUT[transferId]
+      --   if node then
+      --     transferIdTaskLUT[transferId] = nil
+      --     removeFromArray(node.transfers, transferId)
+      --     if #node.transfers == 0 then
+      --       if log then
+      --         inventoryTransferLogger:debug("Node DONE, taskId:%s, jobId:%s", node.taskId, node.jobId)
+      --       end
+      --       -- all transfers finished
+      --       changeNodeState(node, "DONE")
+      --       tickNode(node)
+      --     end
+      --   end
+      -- end
     end
 
 
@@ -1129,7 +1129,7 @@ return {
         loadReservedItems()
         loadCachedTags()
         loadPendingJobs()
-        parallel.waitForAny(tickCrafting, inventoryTransferListener, jsonFileImport, cleanupHandler)
+        parallel.waitForAny(tickCrafting, jsonFileImport, cleanupHandler)
       end,
 
       requestCraft = requestCraft,

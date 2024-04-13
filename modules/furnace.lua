@@ -17,8 +17,8 @@ return {
     },
     dependencies = {
         logger = { min = "1.1", optional = true },
-        crafting = { min = "1.4" },
-        inventory = { min = "1.2" }
+        crafting = { min = "2.0" },
+        inventory = { min = "2.0" }
     },
     ---@param loaded {crafting: modules.crafting, logger: modules.logger|nil, inventory: modules.inventory}
     init = function(loaded, config)

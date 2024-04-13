@@ -13,7 +13,7 @@ end
 
 return {
   id = "inventory",
-  version = "1.2.4",
+  version = "2.0.0",
   config = {
     inventories = {
       type = "table",
@@ -34,16 +34,6 @@ return {
         "minecraft:furnace_.+"
       },
     },
-    flushTimer = {
-      type = "number",
-      description = "Time to wait after a transfer is queued before performing the transfers",
-      default = 1,
-    },
-    flushLimit = {
-      type = "number",
-      description = "Immediately flush the transfer queue when this many transfers are in it",
-      default = 5,
-    },
     defragOnStart = {
       type = "boolean",
       description = "Defragment the storage on storage system start",
@@ -53,11 +43,6 @@ return {
       type = "boolean",
       description = "Defragment the storage each time the queue is flushed.",
       default = false
-    },
-    executeLimit = {
-      type = "number",
-      description = "Maximum number of transfers for abstractInvLib to execute in parallel.",
-      default = 100,
     },
     logAIL = {
       type = "boolean",
@@ -104,7 +89,6 @@ return {
       ailLogger = loaded.logger.interface.logger("inventory", "abstractInvLib")
     end
     local storage = require("abstractInvLib")(inventories, nil, { redirect = function(s) ailLogger:debug(s) end })
-    storage.setBatchLimit(config.inventory.executeLimit.value)
 
     if config.inventory.defragOnStart.value then
       print("Defragmenting...")
@@ -121,7 +105,16 @@ return {
         module[k] = v
       end
     end
-    module.start = storage.run
+    module.start = function()
+      parallel.waitForAny(storage.run, function()
+        while true do
+          local e, id = os.pullEvent("ail_transfer_complete")
+          if id == storage.uid then
+            os.queueEvent("inventoryUpdate")
+          end
+        end
+      end)
+    end
 
     return module
   end,

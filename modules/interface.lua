@@ -3,10 +3,10 @@ local common = require "common"
 ---@field interface modules.interface.interface
 return {
   id = "interface",
-  version = "1.4.0",
+  version = "2.0.0",
   dependencies = {
-    inventory = { min = "1.1" },
-    crafting = { optional = true, min = "1.1" },
+    inventory = { min = "2.0" },
+    crafting = { optional = true, min = "2.0" },
   },
   ---@param loaded {inventory: modules.inventory, crafting: modules.crafting|nil, grid: modules.grid|nil}
   init = function(loaded, config)
@@ -14,7 +14,6 @@ return {
     ---@class genericinterface
     local genericInterface = {}
     ---Push items to an inventory
-    ---@param async boolean
     ---@param targetInventory string
     ---@param name string|number
     ---@param amount nil|number
@@ -22,12 +21,11 @@ return {
     ---@param nbt nil|string
     ---@param options nil|TransferOptions
     ---@return integer|string count
-    function genericInterface.pushItems(async, targetInventory, name, amount, toSlot, nbt, options)
-      return loaded.inventory.interface.pushItems(async, targetInventory, name, amount, toSlot, nbt, options)
+    function genericInterface.pushItems(targetInventory, name, amount, toSlot, nbt, options)
+      return loaded.inventory.interface.pushItems(targetInventory, name, amount, toSlot, nbt, options)
     end
 
     ---Pull items from an inventory
-    ---@param async boolean
     ---@param fromInventory string|AbstractInventory
     ---@param fromSlot string|number
     ---@param amount nil|number
@@ -35,8 +33,20 @@ return {
     ---@param nbt nil|string
     ---@param options nil|TransferOptions
     ---@return integer|string count
-    function genericInterface.pullItems(async, fromInventory, fromSlot, amount, toSlot, nbt, options)
-      return loaded.inventory.interface.pullItems(async, fromInventory, fromSlot, amount, toSlot, nbt, options)
+    function genericInterface.pullItems(fromInventory, fromSlot, amount, toSlot, nbt, options)
+      return loaded.inventory.interface.pullItems(fromInventory, fromSlot, amount, toSlot, nbt, options)
+    end
+
+    function genericInterface.queuePull(fromInventory, fromSlot, amount, toSlot, nbt, options)
+      return loaded.inventory.interface.queuePull(fromInventory, fromSlot, amount, toSlot, nbt, options)
+    end
+
+    function genericInterface.queuePush(targetInventory, name, amount, toSlot, nbt, options)
+      return loaded.inventory.interface.queuePush(targetInventory, name, amount, toSlot, nbt, options)
+    end
+
+    function genericInterface.performTransfer()
+      return loaded.inventory.interface.performTransfer()
     end
 
     ---List the items in this storage
@@ -61,11 +71,6 @@ return {
         end
       end
       return list
-    end
-
-    ---Flush the transfer queue immediately
-    function genericInterface.performTransfer()
-      loaded.inventory.interface.performTransfer()
     end
 
     ---List the craftable items in the inventory

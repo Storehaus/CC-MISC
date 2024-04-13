@@ -3,7 +3,7 @@ local common = require("common")
 ---@class modules.grid
 return {
   id = "grid",
-  version = "1.1.8",
+  version = "2.0.0",
   config = {
     port = {
       type = "number",
@@ -18,8 +18,8 @@ return {
   },
   dependencies = {
     logger = { min = "1.1", optional = true },
-    crafting = { min = "1.1" },
-    interface = { min = "1.4" }
+    crafting = { min = "2.0" },
+    interface = { min = "2.0" }
   },
   ---@param loaded {crafting: modules.crafting, logger: modules.logger|nil}
   init = function(loaded, config)
@@ -204,14 +204,14 @@ return {
     modem.open(config.grid.port.value)
 
     local function emptyTurtle(turtle)
-      local ids = {}
+      local funcs = {}
       for _, slot in pairs(turtle.itemSlots) do
-        ids[loaded.inventory.interface.queuePull(turtle.name, slot)] = true
+        local id = loaded.inventory.interface.queuePull(turtle.name, slot)
+        funcs[#funcs + 1] = function()
+          loaded.inventory.interface.await(id)
+        end
       end
-      repeat
-        local e = { os.pullEvent("inventoryFinished") }
-        ids[e[2]] = nil
-      until not next(ids)
+      parallel.waitForAll(table.unpack(funcs))
     end
 
     local function turtleCraftingDone(turtle)

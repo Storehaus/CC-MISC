@@ -127,12 +127,12 @@ if not turtleMode then
     pollFrequency = 3
 end
 
-local function eventTurtleInventory()
+local function processTurtleInventory()
     while true do
-        os.pullEvent("turtle_inventory")
+        os.pullEvent("do_turtle_transfers")
         for i = importStart, importEnd do
             if turtle.getItemDetail(i) then
-                lib.pullItems(true, inventory, i, nil, nil, nil, { optimal = false })
+                lib.queuePull(inventory, i, nil, nil, nil, { optimal = false })
             end
         end
         if settings.get("misc.dropOnExport") then
@@ -144,6 +144,22 @@ local function eventTurtleInventory()
             end
         end
         lib.performTransfer()
+    end
+end
+
+local function debounceTurtleInventory()
+    local dropExportTimer
+    while true do
+        local e, id = os.pullEvent()
+        if e == "turtle_inventory" then
+            if dropExportTimer then
+                os.cancelTimer(dropExportTimer)
+            end
+            dropExportTimer = os.startTimer(0.1)
+        elseif e == "timer" and id == dropExportTimer then
+            dropExportTimer = nil
+            os.queueEvent("do_turtle_transfers")
+        end
     end
 end
 
@@ -161,7 +177,7 @@ local function inventoryPoll()
             if listing[i] then
                 slotActive = true
                 slotActiveTicks = 0
-                lib.pullItems(true, inventory, i, nil, nil, nil, { optimal = false })
+                lib.queuePull(inventory, i, nil, nil, nil, { optimal = false })
             end
         end
     end
@@ -445,7 +461,7 @@ local function doTransfers(item, target)
         local listing = (wirelessMode and lib.callIntrospection(player, "list")) or invPeripheral.list()
         for i = exportStart, exportEnd do
             if not listing[i] then
-                lib.pushItems(true, inventory, item.name, target, i, item.nbt, { optimal = false })
+                lib.queuePush(inventory, item.name, target, i, item.nbt, { optimal = false })
                 target = target - item.maxCount
                 moved = true
                 if target <= 0 then
@@ -503,14 +519,15 @@ local filter = ""
 ---Handle creating and drawing a searchable menu
 ---@param drawer fun(filter: string, selected: integer, sifted: any[])
 ---@param listProvider fun(): any[]
----@param onSelect fun(selected: any)
+---@param onSelect fun(selected: any, index: integer)
 ---@param event nil|fun(e: any[]): boolean?
 ---@param sort nil|fun(a: any, b: any): boolean
 ---@param match nil|fun(val: any, pattern: string): boolean
 ---@param tab function? mode to switch to upon pushing tab
-local function searchableMenu(drawer, listProvider, onSelect, event, sort, match, tab)
+---@param selected integer?
+local function searchableMenu(drawer, listProvider, onSelect, event, sort, match, tab, selected)
     local sifted = filterList(listProvider(), filter, sort, match)
-    local selected = 1
+    selected = selected or 1
     local controlHeld = false
     while true do
         draw(drawer, filter, selected, sifted)
@@ -535,7 +552,7 @@ local function searchableMenu(drawer, listProvider, onSelect, event, sort, match
                 selected = math.min(selected + 1, #sifted)
             elseif isEnter(key) then
                 if selected > 0 and sifted[selected] then
-                    return onSelect(sifted[selected])
+                    return onSelect(sifted[selected], selected)
                 end
             elseif key == keys.tab and tab then
                 return tab()
@@ -553,7 +570,7 @@ local function searchableMenu(drawer, listProvider, onSelect, event, sort, match
         elseif e[1] == "mouse_click" and e[4] > 3 then
             selected = math.max(math.min(getFirstItemOnScreen(selected, sifted) + e[4] - 4, #sifted), 1)
             if sifted[selected] then
-                return onSelect(sifted[selected])
+                return onSelect(sifted[selected], selected)
             end
         elseif e[1] == "mouse_click" then
             local nm = handleClicks(e[3], e[4])
@@ -566,7 +583,7 @@ local function searchableMenu(drawer, listProvider, onSelect, event, sort, match
     end
 end
 
-
+local search_selected = 1
 function SEARCH()
     local list = lib.list()
     mode = "SEARCH"
@@ -588,7 +605,8 @@ function SEARCH()
         return a.name < b.name
     end
 
-    local onSelect = function(selected)
+    local onSelect = function(selected, index)
+        search_selected = index
         return INFO(selected)
     end
 
@@ -599,7 +617,7 @@ function SEARCH()
         end
     end
 
-    return searchableMenu(drawer, function() return list end, onSelect, event, sort, match, CRAFT)
+    return searchableMenu(drawer, function() return list end, onSelect, event, sort, match, CRAFT, search_selected)
 end
 
 function CRAFT()
@@ -619,43 +637,69 @@ function CRAFT()
     return searchableMenu(drawer, function() return craftables end, onSelect, nil, nil, nil, CONFIG)
 end
 
-function INFO(item)
-    mode = "INFO"
-    local itemAmount = tostring(math.min(item.maxCount, item.count))
+---Read some number from the user
+---@param input number|string
+---@return number
+local function scroll_read(input)
+    ---@type string
+    input = tostring(input)
+    local shiftHeld = false
+    local x, y = term.getCursorPos()
     while true do
-        draw(function()
-            setColors(headerFg, headerBg)
-            clearLine(2)
-            text(1, 2, ("%u x %s"):format(item.count, item.displayName))
-            setColors(mainFg, mainBg)
-            text(1, 3, item.name)
-            text(1, 4, item.nbt)
-            if item.enchantments then
-                text(1, 5, "Enchantments")
-                for k, v in ipairs(item.enchantments) do
-                    text(1, 5 + k, v.displayName or v.name)
-                end
+        term.setCursorPos(x, y)
+        term.write((" "):rep(#input + 1))
+        term.setCursorPos(x, y)
+        term.write(input)
+        local e, char = os.pullEvent()
+        if e == "char" and tonumber(char) then
+            input = input .. char
+        elseif e == "key" then
+            if char == keys.backspace then
+                input = input:sub(1, -2)
+            elseif char == keys.enter then
+                return tonumber(input) or 0
+            elseif char == keys.leftShift then
+                shiftHeld = true
             end
-            text(1, h, ("Withdraw: %s"):format(itemAmount))
-            display.setCursorBlink(true)
-            display.setCursorPos(itemAmount:len() + 11, h)
-        end)
-        local e = { os.pullEvent() }
-        if e[1] == "char" then
-            local ch = e[2]
-            if ch >= '0' and ch <= '9' then
-                itemAmount = itemAmount .. ch
-            end
-        elseif e[1] == "key" then
-            local key = e[2]
-            if key == keys.backspace then
-                itemAmount = itemAmount:sub(1, -2)
-            elseif isEnter(key) then
-                requestItem(false, item, tonumber(itemAmount or 0))
-                return SEARCH()
+        elseif e == "key_up" and char == keys.leftShift then
+            shiftHeld = false
+        elseif e == "mouse_scroll" then
+            local scrollAmount = ((shiftHeld and 8) or 1) * -char
+            local newValue = math.max(scrollAmount + (tonumber(input) or 0), 0)
+            newValue = math.ceil(newValue / scrollAmount) * scrollAmount
+            input = tostring(newValue)
+        elseif e == "mouse_click" then
+            if char == 1 then
+                return tonumber(input) or 0
+            elseif char == 2 then
+                return 0
             end
         end
     end
+end
+
+function INFO(item)
+    mode = "INFO"
+    local itemAmount = math.min(item.maxCount, item.count)
+    draw(function()
+        setColors(headerFg, headerBg)
+        clearLine(2)
+        text(1, 2, ("%u x %s"):format(item.count, item.displayName))
+        setColors(mainFg, mainBg)
+        text(1, 3, item.name)
+        text(1, 4, item.nbt)
+        if item.enchantments then
+            text(1, 5, "Enchantments")
+            for k, v in ipairs(item.enchantments) do
+                text(1, 5 + k, v.displayName or v.name)
+            end
+        end
+        text(1, h, "Withdraw: ")
+        display.setCursorBlink(true)
+    end)
+    itemAmount = scroll_read(itemAmount)
+    requestItem(false, item, tonumber(itemAmount or 0))
+    return SEARCH()
 end
 
 function REQUEST(item)
@@ -673,8 +717,8 @@ function REQUEST(item)
             display.setCursorPos(1, 3)
             display.clearLine()
         end)
-        local input = read()
-        if input == "" then
+        local input = scroll_read(1)
+        if input == 0 then
             return CRAFT()
         end
         local num_input = tonumber(input)
@@ -1136,7 +1180,8 @@ modeLookup = { SEARCH = SEARCH, CRAFT = CRAFT, CONFIG = CONFIG, SYSINFO = SYSINF
 local funcs = { lib.subscribe, SEARCH }
 
 if turtleMode then
-    funcs[#funcs + 1] = eventTurtleInventory
+    funcs[#funcs + 1] = debounceTurtleInventory
+    funcs[#funcs + 1] = processTurtleInventory
 else
     funcs[#funcs + 1] = inventoryPoll
 end
