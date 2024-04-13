@@ -6,15 +6,29 @@ if not settings.get("misc.monitor") then
   settings.set("misc.monitor", monitorSide)
   settings.save()
 end
+local wirelessMode = fs.exists("websocketLib.lua")
+if wirelessMode and not settings.get("misc.websocketURL") then
+  settings.define("misc.websocketURL",{ description = "URL of the websocket to use for wireless communication", type = "string" })
+  print("Enter the URL of the websocket relay service you would like to use.")
+  settings.set("misc.websocketURL", read())
+  settings.save()
+end
 local textScale = 0.5
 
 settings.load()
 monitorSide = settings.get("misc.monitor")
 local monitor = assert(peripheral.wrap(monitorSide), "Invalid monitor")
 
-local lib = require("modemLib")
-local modem = peripheral.getName(peripheral.find("modem"))
-lib.connect(modem)
+local lib
+if not wirelessMode then
+  lib = require("modemLib")
+  local modem = peripheral.getName(peripheral.find("modem"))
+  lib.connect(modem)
+else
+  lib = require("websocketLib")
+  local websocket = settings.get("misc.websocketURL")
+  lib.connect(websocket)
+end
 
 local labelFG = colors.black
 local labelBG = colors.white
