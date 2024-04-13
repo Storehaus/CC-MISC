@@ -27,8 +27,8 @@ return {
         }
     },
     dependencies = {
-        introspection = { min = "1.0", optional = true },
-        inventory = { min = "1.0" }
+        introspection = { min = "2.0", optional = true },
+        inventory = { min = "2.0" }
     },
     ---@param loaded {inventory: modules.inventory, introspection: modules.introspection}
     init = function(loaded, config)
@@ -78,7 +78,7 @@ return {
                 end
                 local periph = peripheral.wrap(introspection) --[[@as table]]
                 args[1] = getBestMatch(loaded.inventory.interface.listNames(), args[1])
-                local count = loaded.inventory.interface.pushItems(false, periph.getInventory(), args[1],
+                local count = loaded.inventory.interface.pushItems(periph.getInventory(), args[1],
                     tonumber(args[2]), nil, args[3], { allowBadTransfers = true })
                 sendMessage(user, "Pushed &9%s &f%s.", count, args[1])
             end,
@@ -107,7 +107,7 @@ return {
                 for _, name in pairs(args) do
                     name = getBestMatch(listing, name)
                     if name then
-                        local count = loaded.inventory.interface.pullItems(false, inv, name, 36 * 64)
+                        local count = loaded.inventory.interface.pullItems(inv, name, 36 * 64)
                         ds = ds .. ("&9%u &fx %s\n"):format(count, name)
                     end
                 end
