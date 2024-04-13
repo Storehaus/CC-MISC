@@ -16,7 +16,7 @@ end
 ---@field interface modules.introspection.interface
 return {
   id = "introspection",
-  version = "1.0.1",
+  version = "2.0.0",
   config = {
     url = {
       type = "string",
@@ -29,7 +29,7 @@ return {
     }
   },
   dependencies = {
-    interface = { min = "1.1" }
+    interface = { min = "2.0" }
   },
   init = function(loaded, config)
     local introspection = {}
@@ -84,12 +84,12 @@ return {
     local function handleMessage(event)
       local message = event.message
       if message.method == "pushItems" or message.method == "pullItems" then
-        local periphName = config.introspection.introspection.value[message.args[2]]
-        local periph = peripheral.wrap(periphName or message.args[2])
+        local periphName = config.introspection.introspection.value[message.args[1]]
+        local periph = peripheral.wrap(periphName or message.args[1])
         if periphName and periph and periph.getInventory then
-          message.args[2] = periph.getInventory()
-          message.args[7] = message.args[7] or {}
-          message.args[7].optimal = false
+          message.args[1] = periph.getInventory()
+          message.args[6] = message.args[6] or {}
+          message.args[6].optimal = false
           message.args.n = 7
         end
       end
