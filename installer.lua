@@ -105,6 +105,7 @@ local introspectionTermInstall = {
   }
 }
 
+
 local crafterInstall = {
   name = "Crafter Turtle",
   files = {
@@ -120,12 +121,21 @@ local monitorInstall = {
   }
 }
 
+local introspectionMonInstall = {
+  name = "Usage Monitor (Introspection)",
+  files = {
+    ["startup.lua"] = fromRepository "clients/usageMonitor.lua",
+    ["websocketLib.lua"] = fromRepository "clients/websocketLib.lua"
+  }
+}
+
 local clientInstallOptions = {
   name = "Client installation options",
   t = terminalInstall,
   i = introspectionTermInstall,
   c = crafterInstall,
   m = monitorInstall,
+  w = introspectionMonInstall,
 }
 
 local installOptions = {

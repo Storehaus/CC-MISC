@@ -372,7 +372,7 @@ interfaceLUT = {
             return
         end
         changeState(STATES.BUSY)
-        print("Too add a crafting recipe, place the recipe in the turtle's inventory.")
+        print("To add a crafting recipe, place the recipe in the turtle's inventory.")
         print("Then enter 1 for shaped, 2 for unshaped, or anything else to cancel")
         local shapeSelection = read()
         if shapeSelection == "1" then
