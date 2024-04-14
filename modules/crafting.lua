@@ -1,3 +1,4 @@
+---@diagnostic disable: missing-fields
 local common = require("common")
 ---@class modules.crafting
 ---@field interface modules.crafting.interface
@@ -183,39 +184,39 @@ return {
       return loaded.inventory.interface.getCount(name) - reservedCount
     end
 
-    ---Reserve amount of item name
-    ---@param name string
-    ---@param amount integer
-    ---@param taskId string
-    ---@return integer
-    local function allocateItems(name, amount, taskId)
-      common.enforceType(name, 1, "string")
-      common.enforceType(amount, 2, "integer")
-      reservedItems[name] = reservedItems[name] or {}
-      reservedItems[name][taskId] = (reservedItems[name][taskId] or 0) + amount
-      saveReservedItems()
-      return amount
-    end
+    -- ---Reserve amount of item name
+    -- ---@param name string
+    -- ---@param amount integer
+    -- ---@param taskId string
+    -- ---@return integer
+    -- local function allocateItems(name, amount, taskId)
+    --   common.enforceType(name, 1, "string")
+    --   common.enforceType(amount, 2, "integer")
+    --   reservedItems[name] = reservedItems[name] or {}
+    --   reservedItems[name][taskId] = (reservedItems[name][taskId] or 0) + amount
+    --   saveReservedItems()
+    --   return amount
+    -- end
 
-    ---Free amount of item name
-    ---@param name string
-    ---@param amount integer
-    ---@param taskId string
-    ---@return integer
-    local function deallocateItems(name, amount, taskId)
-      common.enforceType(name, 1, "string")
-      common.enforceType(amount, 2, "integer")
-      reservedItems[name][taskId] = reservedItems[name][taskId] - amount
-      assert(reservedItems[name][taskId] >= 0, "We have negative items reserved?")
-      if reservedItems[name][taskId] == 0 then
-        reservedItems[name][taskId] = nil
-      end
-      if not next(reservedItems[name]) then
-        reservedItems[name] = nil
-      end
-      saveReservedItems()
-      return amount
-    end
+    -- ---Free amount of item name
+    -- ---@param name string
+    -- ---@param amount integer
+    -- ---@param taskId string
+    -- ---@return integer
+    -- local function deallocateItems(name, amount, taskId)
+    --   common.enforceType(name, 1, "string")
+    --   common.enforceType(amount, 2, "integer")
+    --   reservedItems[name][taskId] = reservedItems[name][taskId] - amount
+    --   assert(reservedItems[name][taskId] >= 0, "We have negative items reserved?")
+    --   if reservedItems[name][taskId] == 0 then
+    --     reservedItems[name][taskId] = nil
+    --   end
+    --   if not next(reservedItems[name]) then
+    --     reservedItems[name] = nil
+    --   end
+    --   saveReservedItems()
+    --   return amount
+    -- end
 
     local cachedStackSizes = {}
 
@@ -586,7 +587,8 @@ return {
         local available = getCount(name)
         if available > 0 and not force then
           -- we do, so allocate it
-          local allocateAmount = allocateItems(name, math.min(available, remaining), node.taskId)
+          local allocateAmount = math.min(available, remaining)
+          -- local allocateAmount = allocateItems(name, math.min(available, remaining), node.taskId)
           node.type = "ITEM"
           node.count = allocateAmount
           remaining = remaining - allocateAmount
@@ -631,7 +633,7 @@ return {
     function deleteTask(task)
       common.enforceType(task, 1, "table")
       if task.type == "ITEM" then
-        deallocateItems(task.name, task.count, task.taskId)
+        -- deallocateItems(task.name, task.count, task.taskId)
       end
       if task.parent then
         removeFromArray(task.parent.children, task)
@@ -836,7 +838,7 @@ return {
           removeChildrensParents(task)
         end
         if task.type == "ITEM" then
-          deallocateItems(task.name, task.count, task.taskId)
+          -- deallocateItems(task.name, task.count, task.taskId)
         end
         -- if it's not in these two states, then it's not cancellable
         return
@@ -1093,7 +1095,7 @@ return {
           for nodeId, count in pairs(nodes) do
             if not taskLookup[nodeId] then
               cleanupLogger:debug("Deallocating %u of item %s, Node %s is not in the task lookup.", count, name, nodeId)
-              deallocateItems(name, count, nodeId)
+              -- deallocateItems(name, count, nodeId)
             end
           end
         end
