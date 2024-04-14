@@ -43,6 +43,7 @@ return {
     ---@field type "CG"
     ---@field toCraft integer
     ---@field plan table<integer,{max:integer,name:string,count:integer}>
+    ---@field handles table<string,ItemHandle>
 
     local crafting = loaded.crafting.interface.recipeInterface
 
@@ -392,6 +393,7 @@ return {
       node.height = recipe.height
       node.children = {}
       node.name = name
+      node.handles = {}
       local requiredItemCounts = {}
       for k, v in pairs(plan) do
         v.count = toCraft
@@ -403,7 +405,13 @@ return {
         end
       end
       for k, v in pairs(requiredItemCounts) do
-        crafting.mergeInto(crafting.craft(k, v, node.jobId, nil, requestChain), node.children)
+        local nodes = crafting.craft(k, v, node.jobId, nil, requestChain)
+        for i, n in ipairs(nodes) do
+          if n.type == "ITEM" then
+            node.handles[n.name] = n.handle
+          end
+        end
+        crafting.mergeInto(nodes, node.children)
       end
       for k, v in pairs(node.children) do
         v.parent = node
@@ -434,11 +442,17 @@ return {
         availableTurtle.task = node
         node.turtle = availableTurtle.name
         local transfers = {}
+        local handleUsage = {}
         for slot, v in pairs(node.plan) do
           local x = (slot - 1) % (node.width or 3) + 1
           local y = math.floor((slot - 1) / (node.width or 3))
           local turtleSlot = y * 4 + x
-          table.insert(transfers, function() crafting.pushItems(availableTurtle.name, v.name, v.count, turtleSlot) end)
+          local item = v.name
+          local handle = node.handles[v.name]
+          if handle then
+            item = handle
+          end
+          table.insert(transfers, function() crafting.pushItems(availableTurtle.name, item, v.count, turtleSlot) end)
         end
         availableTurtle.state = "BUSY"
         parallel.waitForAll(table.unpack(transfers))

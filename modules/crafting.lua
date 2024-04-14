@@ -1,4 +1,4 @@
----@diagnostic disable: missing-fields
+----@diagnostic disable: missing-fields
 local common = require("common")
 ---@class modules.crafting
 ---@field interface modules.crafting.interface
@@ -149,74 +149,14 @@ return {
     ---@field jobId string
     ---@field state NodeState
     ---@field priority integer TODO
-
-    ---@type table<string,table<string,integer>> item name -> count reserved
-    local reservedItems = {}
-
-    bfile.addAlias("string_uint16_map", "map<string,uint16>")
-    bfile.newStruct("reserved_items"):add("map<string,string_uint16_map>", "^")
-
-    local function saveReservedItems()
-      if not config.crafting.persistence.value then
-        return
-      end
-      common.saveTableToFile(".cache/reserved_items.txt", reservedItems)
-    end
-
-    local function loadReservedItems()
-      if not config.crafting.persistence.value then
-        reservedItems = {}
-        return
-      end
-      reservedItems = common.loadTableFromFile(".cache/reserved_items.txt") or {}
-    end
+    ---@field handle ItemHandle
 
     ---Get count of item in system, excluding reserved
     ---@param name string
     ---@return integer
     local function getCount(name)
-      common.enforceType(name, 1, "string")
-      local reservedCount = 0
-      for k, v in pairs(reservedItems[name] or {}) do
-        -- TODO add check to ensure this is not leaked
-        reservedCount = reservedCount + v
-      end
-      return loaded.inventory.interface.getCount(name) - reservedCount
+      return loaded.inventory.interface.getCount(name)
     end
-
-    -- ---Reserve amount of item name
-    -- ---@param name string
-    -- ---@param amount integer
-    -- ---@param taskId string
-    -- ---@return integer
-    -- local function allocateItems(name, amount, taskId)
-    --   common.enforceType(name, 1, "string")
-    --   common.enforceType(amount, 2, "integer")
-    --   reservedItems[name] = reservedItems[name] or {}
-    --   reservedItems[name][taskId] = (reservedItems[name][taskId] or 0) + amount
-    --   saveReservedItems()
-    --   return amount
-    -- end
-
-    -- ---Free amount of item name
-    -- ---@param name string
-    -- ---@param amount integer
-    -- ---@param taskId string
-    -- ---@return integer
-    -- local function deallocateItems(name, amount, taskId)
-    --   common.enforceType(name, 1, "string")
-    --   common.enforceType(amount, 2, "integer")
-    --   reservedItems[name][taskId] = reservedItems[name][taskId] - amount
-    --   assert(reservedItems[name][taskId] >= 0, "We have negative items reserved?")
-    --   if reservedItems[name][taskId] == 0 then
-    --     reservedItems[name][taskId] = nil
-    --   end
-    --   if not next(reservedItems[name]) then
-    --     reservedItems[name] = nil
-    --   end
-    --   saveReservedItems()
-    --   return amount
-    -- end
 
     local cachedStackSizes = {}
 
@@ -577,6 +517,7 @@ return {
       craftLogger:debug("Remaining craft count for %s is %u", name, remaining)
       while remaining > 0 do
         ---@type CraftingNode
+        ---@diagnostic disable-next-line: missing-fields
         local node = {
           name = name,
           taskId = id(),
@@ -591,6 +532,7 @@ return {
           -- local allocateAmount = allocateItems(name, math.min(available, remaining), node.taskId)
           node.type = "ITEM"
           node.count = allocateAmount
+          node.handle = loaded.inventory.interface.allocateItem(allocateAmount, name)
           remaining = remaining - allocateAmount
           craftLogger:debug("Item. name:%s,count:%u,taskId:%s,jobId:%s", name, allocateAmount, node.taskId, jobId)
         else
@@ -693,12 +635,12 @@ return {
     ---Protected pushItems, errors if it cannot move
     ---enough items to a slot
     ---@param to string
-    ---@param name string
+    ---@param name ItemHandle
     ---@param toMove integer
     ---@param slot integer
     local function pushItems(to, name, toMove, slot)
       common.enforceType(to, 1, "string")
-      common.enforceType(name, 2, "string")
+      -- common.enforceType(name, 2, "string")
       common.enforceType(toMove, 3, "integer")
       common.enforceType(slot, 4, "integer")
       local failCount = 0
@@ -755,6 +697,7 @@ return {
       common.enforceType(node, 1, "table")
       if not node.state then
         if node.type == "ROOT" then
+          ---@diagnostic disable-next-line: inject-field
           node.startTime = os.epoch("utc")
         end
         -- This is an uninitialized node
@@ -849,45 +792,6 @@ return {
     ---@type table<JobId,CraftingNode>
     local pendingJobs = {}
 
-    local function savePendingJobs()
-      if not config.crafting.persistence.value then
-        return
-      end
-      local flatPendingJobs = {}
-      for jobIndex, job in pairs(pendingJobs) do
-        local clone = shallowClone(job)
-        runOnAll(clone, function(node)
-          node.parent = nil
-          for k, v in pairs(node.children or {}) do
-            node.children[k] = shallowClone(v)
-          end
-        end)
-        flatPendingJobs[jobIndex] = clone
-      end
-      local f = assert(fs.open(".cache/pending_jobs.bin", "wb"))
-      f.write(bfile.serialise(flatPendingJobs))
-      f.close()
-    end
-
-    local function loadPendingJobs()
-      if not config.crafting.persistence.value then
-        pendingJobs = {}
-        return
-      end
-      local f = fs.open(".cache/pending_jobs.bin", "rb")
-      if f then
-        pendingJobs = bfile.unserialise(f.readAll() or "")
-        f.close()
-      else
-        pendingJobs = {}
-      end
-      runOnAll(pendingJobs, function(node)
-        for k, v in pairs(node.children or {}) do
-          v.parent = node
-        end
-      end)
-    end
-
     ---Cancel a job by given id
     ---@param jobId any
     local function cancelCraft(jobId)
@@ -897,7 +801,6 @@ return {
       if pendingJobs[jobId] then
         jobRoot = pendingJobs[jobId]
         pendingJobs[jobId] = nil
-        savePendingJobs()
         return
       elseif not jobLookup[jobId] then
         craftLogger:warn("Attempt to cancel non-existant job %s", jobId)
@@ -981,6 +884,7 @@ return {
       local job = craft(name, count, jobId, true)
 
       ---@type CraftingNode
+      ---@diagnostic disable-next-line: missing-fields
       local root = {
         jobId = jobId,
         children = job,
@@ -990,7 +894,6 @@ return {
       }
 
       pendingJobs[jobId] = root
-      savePendingJobs()
 
       return jobId
     end
@@ -1034,7 +937,6 @@ return {
       if not jobInfo.success then
         craftLogger:debug("Craft job failed, cancelling")
         -- cancelCraft(jobId)
-        savePendingJobs()
       end
       return jobInfo
     end
@@ -1054,7 +956,6 @@ return {
         return false -- cannot start unsuccessful job
       end
       pendingJobs[jobId] = nil
-      savePendingJobs()
       jobLookup[jobId] = {}
       runOnAll(job, function(node)
         taskLookup[node.taskId] = node
@@ -1087,16 +988,8 @@ return {
         end
         for k, v in pairs(jobLookup) do
           if #v == 0 then
-            cleanupLogger:debug("No tasks with JobId %s, removing from the lookkup.", k)
+            cleanupLogger:debug("No tasks with JobId %s, removing from the lookup.", k)
             jobLookup[k] = nil
-          end
-        end
-        for name, nodes in pairs(reservedItems) do
-          for nodeId, count in pairs(nodes) do
-            if not taskLookup[nodeId] then
-              cleanupLogger:debug("Deallocating %u of item %s, Node %s is not in the task lookup.", count, name, nodeId)
-              -- deallocateItems(name, count, nodeId)
-            end
           end
         end
       end
@@ -1128,9 +1021,7 @@ return {
       start = function()
         loadTaskLookup()
         loadItemLookup()
-        loadReservedItems()
         loadCachedTags()
-        loadPendingJobs()
         parallel.waitForAny(tickCrafting, jsonFileImport, cleanupHandler)
       end,
 
