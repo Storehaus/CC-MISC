@@ -11,7 +11,7 @@ The directory structure of this project is as follows
 - `recipes/` all vanilla grid recipes stored in custom binary format
 - `suspended/` modules which development has been suspended on
 - `common.lua` common library file (that should be split up in the future)
-- `abstractInvLib.lua` local copy of [`abstractInvLib.lua`](https://gist.github.com/MasonGulu/57ef0f52a93304a17a9eaea21f431de6) to ease development, will eventually be removed
+- `abstractInvLib.lua` local copy of [`abstractInvLib.lua`](https://gist.github.com/ShreksHellraiser/57ef0f52a93304a17a9eaea21f431de6) to ease development, will eventually be removed
 - `storage.lua` entrypoint and module loader
 
 # Setup
@@ -26,7 +26,7 @@ A minimal MISC system consists of
 
 The client can be advanced or basic, it supports both mouse and keyboard.
 
-On both your server and all your clients simply run `wget run https://raw.githubusercontent.com/MasonGulu/CC-MISC/master/installer.lua`.
+On both your server and all your clients simply run `wget run https://raw.githubusercontent.com/ShreksHellraiser/CC-MISC/master/installer.lua`.
 
 On your server select the base MISC system option.
 
