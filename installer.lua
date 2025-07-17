@@ -1,7 +1,7 @@
-local repositoryUrl = "https://raw.githubusercontent.com/MasonGulu/CC-MISC/master/"
+local repositoryUrl = "https://raw.githubusercontent.com/ShreksHellraiser/CC-MISC/master/"
 
 if ({ ... })[1] == "dev" then
-  repositoryUrl = "https://raw.githubusercontent.com/MasonGulu/CC-MISC/dev/"
+  repositoryUrl = "https://raw.githubusercontent.com/ShreksHellraiser/CC-MISC/dev/"
 end
 
 local function fromURL(url)
@@ -60,7 +60,7 @@ local baseInstall = {
   name = "Base MISC",
   files = {
     ["startup.lua"] = fromRepository "storage.lua",
-    ["abstractInvLib.lua"] = fromURL "https://gist.githubusercontent.com/MasonGulu/57ef0f52a93304a17a9eaea21f431de6/raw/07c3322a5fa0d628e558e19017295728e4ee2e8d/abstractInvLib.lua", -- TODO change this
+    ["abstractInvLib.lua"] = fromURL "https://gist.githubusercontent.com/ShreksHellraiser/57ef0f52a93304a17a9eaea21f431de6/raw/07c3322a5fa0d628e558e19017295728e4ee2e8d/abstractInvLib.lua", -- TODO change this
     ["common.lua"] = fromRepository "common.lua",
     modules = {
       ["inventory.lua"] = fromRepository "modules/inventory.lua",
