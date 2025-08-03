@@ -79,6 +79,15 @@ local ioInstall = {
   }
 }
 
+local watchdogInstall = {
+  name = "Watch Dog Module",
+  files = {
+    modules = {
+      ["watchdog.lua"] = fromRepository "modules/watchdog.lua"
+    }
+  }
+}
+
 local serverInstallOptions = {
   name = "Server installation options",
   b = baseInstall,
@@ -87,6 +96,7 @@ local serverInstallOptions = {
   l = logInstall,
   o = ioInstall,
   r = chatboxInstall,
+  w = watchdogInstall
 }
 
 local terminalInstall = {
