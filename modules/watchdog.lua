@@ -20,7 +20,7 @@ return {
     }
   },
   setup = function (moduleConfig)
-    print("Autodetecting watchdog")
+    print("Autodetecting watch dog")
     local watchdogp = peripheral.getName(peripheral.find("tm_wdt", function (name, _)
       -- If the name does not contain tm_wdt then it's directly attached.
       if string.find(name, 'tm_wdt') == nil then
@@ -32,8 +32,8 @@ return {
       print(textutils.serialise(watchdogp))
       moduleConfig.watchdog.value = watchdogp
     else
-      print("No watchdog found")
-      -- force disable if no watchdog found
+      print("No watch dog found")
+      -- force disable if no watch dog found
       moduleConfig.enabled.value = false
     end
   end,
@@ -48,7 +48,7 @@ return {
           wdt.setEnabled(true)
         end
         while true do
-          -- sleep for half of the wdt timeout
+          -- sleep for half of the watch dog timeout
           sleep(config.watchdog.timeout.value / 20 / 2)
           if config.watchdog.enabled.value == true then
             wdt.reset()
