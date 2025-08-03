@@ -44,6 +44,7 @@ return {
         local wdt = nil
         if config.watchdog.enabled.value == true then
           wdt = peripheral.wrap(config.watchdog.watchdog.value)
+          wdt.setEnabled(false)
           wdt.setTimeout(config.watchdog.timeout.value)
           wdt.setEnabled(true)
         end
