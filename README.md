@@ -1,5 +1,5 @@
 # MISC - Modular Inventory Storage and Crafting
-
+TEST
 PRs are welcome to this project, I hope the documentation is clear enough, but if you have any questions feel free to ask.
 
 This documentation is also available at misc.madefor.cc
