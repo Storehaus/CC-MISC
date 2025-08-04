@@ -1,7 +1,7 @@
-local repositoryUrl = "https://raw.githubusercontent.com/ShreksHellraiser/CC-MISC/master/"
+local repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/master/"
 
 if ({ ... })[1] == "dev" then
-  repositoryUrl = "https://raw.githubusercontent.com/ShreksHellraiser/CC-MISC/dev/"
+  repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
 end
 
 local function fromURL(url)
