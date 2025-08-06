@@ -83,4 +83,13 @@ end
 
 writeUsage()
 
-parallel.waitForAny(lib.subscribe, handleUpdates)
+local watchdogAvaliable = fs.exists("watchdogLib.lua")
+local funcs = {lib.subscribe, handleUpdates}
+if watchdogAvaliable then
+  local watchdogLib = require '.watchdogLib'
+  local wdFunc = watchdogLib.watchdogLoopFromSettings()
+  if wdFunc ~= nil then
+      funcs[#funcs+1] = wdFunc
+  end
+end
+parallel.waitForAny(table.unpack(funcs))

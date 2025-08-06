@@ -1179,6 +1179,15 @@ modeLookup = { SEARCH = SEARCH, CRAFT = CRAFT, CONFIG = CONFIG, SYSINFO = SYSINF
 
 local funcs = { lib.subscribe, SEARCH }
 
+local watchdogAvaliable = fs.exists("watchdogLib.lua")
+if watchdogAvaliable then
+  local watchdogLib = require '.watchdogLib'
+  local wdFunc = watchdogLib.watchdogLoopFromSettings()
+  if wdFunc ~= nil then
+      funcs[#funcs+1] = wdFunc
+  end
+end
+
 if turtleMode then
     funcs[#funcs + 1] = debounceTurtleInventory
     funcs[#funcs + 1] = processTurtleInventory
