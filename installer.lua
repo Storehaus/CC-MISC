@@ -82,6 +82,7 @@ local ioInstall = {
 local watchdogInstall = {
   name = "Watch Dog Module",
   files = {
+    ["watchdogLib.lua"] = fromRepository "shared/watchdogLib.lua",
     modules = {
       ["watchdog.lua"] = fromRepository "modules/watchdog.lua"
     }
@@ -139,6 +140,13 @@ local introspectionMonInstall = {
   }
 }
 
+local clientWatchdogInstall = {
+  name = "Watch Dog Module",
+  files = {
+    ["watchdogLib.lua"] = fromRepository "shared/watchdogLib.lua"
+  }
+}
+
 local clientInstallOptions = {
   name = "Client installation options",
   t = terminalInstall,
@@ -146,6 +154,7 @@ local clientInstallOptions = {
   c = crafterInstall,
   m = monitorInstall,
   w = introspectionMonInstall,
+  d = clientWatchdogInstall
 }
 
 local installOptions = {
