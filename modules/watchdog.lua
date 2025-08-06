@@ -29,7 +29,6 @@ return {
       end))
     -- TODO: Make this able to handle having multiple watchdogs attached.
     if watchdogp ~= nil then
-      print(textutils.serialise(watchdogp))
       moduleConfig.watchdog.value = watchdogp
     else
       print("No watch dog found")
