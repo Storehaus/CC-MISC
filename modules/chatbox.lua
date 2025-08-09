@@ -77,10 +77,16 @@ return {
                     sendMessage(user, "usage: withdraw [name] <count> <nbt>")
                 end
                 local periph = peripheral.wrap(introspection) --[[@as table]]
+                local ogItem = args[1]
                 args[1] = getBestMatch(loaded.inventory.interface.listNames(), args[1])
-                local count = loaded.inventory.interface.pushItems(false, periph.getInventory(), args[1],
-                    tonumber(args[2]), nil, args[3], { allowBadTransfers = true })
-                sendMessage(user, "Pushed &9%s &f%s.", count, args[1])
+
+                if args[1] ~= nil then
+                    local count = loaded.inventory.interface.pushItems(false, periph.getInventory(), args[1],
+                        tonumber(args[2]), nil, args[3], { allowBadTransfers = true })
+                    sendMessage(user, "Pushed &9%s &f%s.", count, args[1])
+                else
+                    sendMessage(user,"%s not found",ogItem)
+                end
             end,
             balance = function(user, args)
                 if #args < 1 then
