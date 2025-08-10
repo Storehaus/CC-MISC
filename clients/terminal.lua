@@ -640,7 +640,28 @@ end
 ---Read some number from the user
 ---@param input number|string
 ---@return number
+
+
+
+
 local function scroll_read(input)
+    correctChars = {
+        "*","/","+","-","(",")",
+    }
+
+    local function isCorrectChar(char)
+        if tonumber(char) then return true end
+        for i,correctChar in ipairs(correctChars) do
+            if char == correctChar then
+                return true
+            end
+        end
+        return false
+
+    end
+
+
+
     ---@type string
     input = tostring(input)
     local shiftHeld = false
@@ -651,13 +672,15 @@ local function scroll_read(input)
         term.setCursorPos(x, y)
         term.write(input)
         local e, char = os.pullEvent()
-        if e == "char" and tonumber(char) then
-            input = input .. char
+        if e == "char" then
+            if isCorrectChar(char) then
+                input = input .. char
+            end
         elseif e == "key" then
             if char == keys.backspace then
                 input = input:sub(1, -2)
             elseif char == keys.enter then
-                return tonumber(input) or 0
+                return tonumber(loadstring("return " .. input)()) or 0
             elseif char == keys.leftShift then
                 shiftHeld = true
             end
@@ -680,7 +703,8 @@ end
 
 function INFO(item)
     mode = "INFO"
-    local itemAmount = math.min(item.maxCount, item.count)
+    --local itemAmount = math.min(item.maxCount, item.count)
+    local itemAmount = ""
     draw(function()
         setColors(headerFg, headerBg)
         clearLine(2)
@@ -1178,15 +1202,6 @@ end
 modeLookup = { SEARCH = SEARCH, CRAFT = CRAFT, CONFIG = CONFIG, SYSINFO = SYSINFO }
 
 local funcs = { lib.subscribe, SEARCH }
-
-local watchdogAvaliable = fs.exists("watchdogLib.lua")
-if watchdogAvaliable then
-  local watchdogLib = require '.watchdogLib'
-  local wdFunc = watchdogLib.watchdogLoopFromSettings()
-  if wdFunc ~= nil then
-      funcs[#funcs+1] = wdFunc
-  end
-end
 
 if turtleMode then
     funcs[#funcs + 1] = debounceTurtleInventory
