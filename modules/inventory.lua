@@ -104,7 +104,12 @@ return {
       ailLogger = loaded.logger.interface.logger("inventory", "abstractInvLib")
     end
     ailLogger = config.inventory.logAIL.value and ailLogger
-    local storage = require("abstractInvLib")(inventories, nil, { redirect = function(s) ailLogger:debug(s) end })
+    local storage
+    if ailLogger then
+      storage = require("abstractInvLib")(inventories, nil, { redirect = function(s) ailLogger:debug(s) end })
+    else
+      storage = require("abstractInvLib")(inventories, nil)
+    end
     storage.setBatchLimit(config.inventory.executeLimit.value)
     local transferQueue = {}
     local transferTimer
