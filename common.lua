@@ -4,7 +4,7 @@ local function saveTableToFile(file, table, compact, repetitions)
   if not f then
     return false
   end
-  f.write(textutils.serialise(table, {compact=compact, allow_repetitions = repetitions}))
+  f.write(textutils.serialise(table, { compact = compact, allow_repetitions = repetitions }))
   f.close()
   return true
 end
@@ -25,7 +25,7 @@ local function printf(s, ...)
 end
 
 local function f(s)
-  local env = setmetatable({}, {__index = _ENV})
+  local env = setmetatable({}, { __index = _ENV })
   local f = (debug.getinfo(2, "f") or {}).func
   if f then
     for i = 1, math.huge do
@@ -39,24 +39,25 @@ local function f(s)
     if not k then break end
     env[k] = v
   end
-  return s:gsub("%$%b{}", function(c) return table.concat({assert(load("return " .. c:sub(3, -2), "=codestr", "t", env))()}, " ") end)
+  return s:gsub("%$%b{}",
+    function(c) return table.concat({ assert(load("return " .. c:sub(3, -2), "=codestr", "t", env))() }, " ") end)
 end
 
 -- Probably an abomination. I don't remember much about what it does.
 local function layout(t, startX, startY, fullWidth, fullHeight, itemHeight)
-  local w,h = 1,1
+  local w, h = 1, 1
   itemHeight = itemHeight or 3
-  itemHeight = "("..itemHeight..")"
-  local lineHeight = "("..itemHeight.."+1)"
+  itemHeight = "(" .. itemHeight .. ")"
+  local lineHeight = "(" .. itemHeight .. "+1)"
   startX, startY = startX or 2, startY or 2
-  startX, startY = "("..startX..")", "("..startY..")"
+  startX, startY = "(" .. startX .. ")", "(" .. startY .. ")"
   fullWidth, fullHeight = fullWidth or "(parent.w-2)", fullHeight or "(parent.h-2)"
-  fullWidth, fullHeight = "("..fullWidth..")", "("..fullHeight..")"
+  fullWidth, fullHeight = "(" .. fullWidth .. ")", "(" .. fullHeight .. ")"
   -- initial pass to get the width and height of the 2D array
-  for k,v in pairs(t) do
-    h = math.max(k,h)
-    for k2,v2 in pairs(v) do
-      w = math.max(k2,w)
+  for k, v in pairs(t) do
+    h = math.max(k, h)
+    for k2, v2 in pairs(v) do
+      w = math.max(k2, w)
     end
   end
   -- second pass to do width/height processing on each element
@@ -66,42 +67,42 @@ local function layout(t, startX, startY, fullWidth, fullHeight, itemHeight)
     for x = 1, w do
       local item = t[y][x]
       layoutInfo[y][x] = {
-        w=1,
-        h=1,
-        x=x,
-        y=y,
+        w = 1,
+        h = 1,
+        x = x,
+        y = y,
         processed = false
       } -- cell width/height
       if item == "up" then
-        assert(y~=1, "Attempt to expand element above first row")
-        layoutInfo[y][x] = layoutInfo[y-1][x]
+        assert(y ~= 1, "Attempt to expand element above first row")
+        layoutInfo[y][x] = layoutInfo[y - 1][x]
         -- TODO change this so that the height is set to the distance between the two
         layoutInfo[y][x].h = y - layoutInfo[y][x].y + 1
       elseif item == "left" then
-        assert(x~=1, "Attempt to expand element to left of first column")
-        layoutInfo[y][x] = layoutInfo[y][x-1]
+        assert(x ~= 1, "Attempt to expand element to left of first column")
+        layoutInfo[y][x] = layoutInfo[y][x - 1]
         layoutInfo[y][x].w = x - layoutInfo[y][x].x + 1
       elseif type(item) == "table" then
         -- this is an element
       elseif type(item) == "nil" then
         layoutInfo[y][x].processed = true
       else
-        error("Invalid entry at "..x..","..y)
+        error("Invalid entry at " .. x .. "," .. y)
       end
     end
   end
 
-  local calw, calh = "("..fullWidth.."/"..w..")", itemHeight
+  local calw, calh = "(" .. fullWidth .. "/" .. w .. ")", itemHeight
   for y = 1, h do
     for x = 1, w do
       if not layoutInfo[y][x].processed then
         local item = layoutInfo[y][x]
         item.processed = true
         -- set position and size of element, based on the calculated values
-        local dw, dh = calw.."*"..item.w.."-1-.2", calh.."+".. item.h-1 .."*"..lineHeight
+        local dw, dh = calw .. "*" .. item.w .. "-1-.2", calh .. "+" .. item.h - 1 .. "*" .. lineHeight
         t[y][x]:setSize(dw, dh)
-        local dx, dy = calw.."*"..(x-1).."+0.2+"..startX, lineHeight.."*"..(y-1).."+"..startY
-        t[y][x]:setPosition(dx,dy)
+        local dx, dy = calw .. "*" .. (x - 1) .. "+0.2+" .. startX, lineHeight .. "*" .. (y - 1) .. "+" .. startY
+        t[y][x]:setPosition(dx, dy)
         print(dw, dh)
         print(dx, dy)
       end
@@ -122,29 +123,29 @@ local function writeUInt8(f, i)
 end
 ---@param f handle
 ---@param str string
-local function writeString(f,str)
+local function writeString(f, str)
   writeUInt16(f, str:len())
   f.write(str)
 end
 
 ---@param f handle
 ---@param t table
-local function writeUInt16T(f,t)
-  writeUInt8(f,#t)
-  for k,v in ipairs(t) do
-    writeUInt16(f,v)
+local function writeUInt16T(f, t)
+  writeUInt8(f, #t)
+  for k, v in ipairs(t) do
+    writeUInt16(f, v)
   end
 end
 
 ---@param f handle
 ---@return integer
 local function readUInt16(f)
-  return select(1,string.unpack(">I2",f.read(2)))
+  return select(1, string.unpack(">I2", f.read(2)))
 end
 ---@param f handle
 ---@return integer
 local function readUInt8(f)
-  return select(1,string.unpack("I1",f.read(1)))
+  return select(1, string.unpack("I1", f.read(1)))
 end
 ---@param f handle
 ---@return string
@@ -163,7 +164,7 @@ local function readUInt16T(f)
   return t
 end
 
-local function checkType(value,targetType)
+local function checkType(value, targetType)
   assert(type(targetType) == "string", "Type is not a string")
   if targetType:sub(-2) == "[]" then
     -- this is an array type
@@ -171,7 +172,7 @@ local function checkType(value,targetType)
       return false
     end
     for i, val in pairs(value) do
-      if not checkType(val, targetType:sub(1,-3)) then
+      if not checkType(val, targetType:sub(1, -3)) then
         return false
       end
     end
@@ -186,13 +187,15 @@ end
 ---@param value any
 ---@param argPos integer
 ---@param ... string types, supports array-likes with [], and integer types
-local function enforceType(value,argPos,...)
-  for _,targetType in ipairs({...}) do
+local function enforceType(value, argPos, ...)
+  for _, targetType in ipairs({ ... }) do
     if checkType(value, targetType) then
       return
     end
   end
-  error(("Argument #%u invalid, expected %s, got %s"):format(argPos, textutils.serialise({...},{compact=true}),type(value)), 2)
+  error(
+  ("Argument #%u invalid, expected %s, got %s"):format(argPos, textutils.serialise({ ... }, { compact = true }),
+    type(value)), 2)
 end
 
 return {
