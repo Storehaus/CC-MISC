@@ -207,7 +207,7 @@ local function getValue(type)
   end
 end
 
-local loadedConfig = common.loadTableFromFile("config.txt") or {}
+local loadedConfig = common.loadTableFromFile("config.lua") or {}
 for id, spec in pairs(config) do
   for name, info in pairs(spec) do
     local loadedValue = protectedIndex(loadedConfig, id, name, "value")
