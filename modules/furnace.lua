@@ -99,8 +99,8 @@ return {
             table.sort(fuelDiffs, function(a, b)
                 return a.diff < b.diff
             end)
-
-            return fuelDiffs[1].fuel, fuelDiffs[1].multiple, fuelDiffs[1].optimal
+            -- TODO: Replace this hack with a proper optimizer that respects what is in storage.
+            return fuelDiffs[1].fuel, fuelDiffs[1].multiple, toSmelt -- fuelDiffs[1].optimal
         end
 
         ---@class FurnaceNode : CraftingNode
