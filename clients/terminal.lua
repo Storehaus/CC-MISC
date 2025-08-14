@@ -232,7 +232,7 @@ local function themeSetup(dev)
     dev.setPaletteColor(colors.black, 0x0f0f0f)
     dev.setPaletteColor(colors.gray, 0xb9b9b9)
     dev.setPaletteColor(colors.lightGray, 0xe7e7e7)
-    dev.setPaletteColor(colors.cyan, 0xdee4e9)     -- blue tinted gray
+    dev.setPaletteColor(colors.cyan, 0xdee4e9) -- blue tinted gray
   elseif theme == "graphite" then
     mainBg = colors.white
     mainFg = colors.black
@@ -244,12 +244,12 @@ local function themeSetup(dev)
     selectFg = colors.white
     headerBg = colors.gray
     listBg = colors.cyan
-    dev.setPaletteColor(colors.blue, 0x556077)     -- desaturated blue
+    dev.setPaletteColor(colors.blue, 0x556077) -- desaturated blue
     dev.setPaletteColor(colors.white, 0xffffff)
     dev.setPaletteColor(colors.black, 0x0f0f0f)
     dev.setPaletteColor(colors.gray, 0xbebebe)
     dev.setPaletteColor(colors.lightGray, 0xe7e7e7)
-    dev.setPaletteColor(colors.cyan, 0xe1e5ee)     -- blue tinted gray
+    dev.setPaletteColor(colors.cyan, 0xe1e5ee) -- blue tinted gray
   elseif theme == "hotdogstand" then
     mainBg = colors.red
     mainFg = colors.white
@@ -280,10 +280,10 @@ local function themeSetup(dev)
     selectBg = colors.black
     selectFg = colors.white
 
-    dev.setPaletteColor(colors.gray, 0xCEB15F)       -- turtle slot color
-    dev.setPaletteColor(colors.yellow, 0xdba519)     -- turtle yellow
-    dev.setPaletteColor(colors.white, 0xfcfcfc)      -- off white
-    dev.setPaletteColor(colors.black, 0x1c0a11)      -- off black
+    dev.setPaletteColor(colors.gray, 0xCEB15F)   -- turtle slot color
+    dev.setPaletteColor(colors.yellow, 0xdba519) -- turtle yellow
+    dev.setPaletteColor(colors.white, 0xfcfcfc)  -- off white
+    dev.setPaletteColor(colors.black, 0x1c0a11)  -- off black
   end
 
   -- selected item in lists
@@ -645,86 +645,84 @@ end
 
 
 local function scroll_read(input)
-    correctChars = {
-        "*","/","+","-","(",")",
-    }
+  correctChars = {
+    "*", "/", "+", "-", "(", ")",
+  }
 
-    local function isCorrectChar(char)
-        if tonumber(char) then return true end
-        for i,correctChar in ipairs(correctChars) do
-            if char == correctChar then
-                return true
-            end
-        end
-        return false
-
+  local function isCorrectChar(char)
+    if tonumber(char) then return true end
+    for i, correctChar in ipairs(correctChars) do
+      if char == correctChar then
+        return true
+      end
     end
+    return false
+  end
 
 
 
-    ---@type string
-    input = tostring(input)
-    local shiftHeld = false
-    local x, y = term.getCursorPos()
-    while true do
-        term.setCursorPos(x, y)
-        term.write((" "):rep(#input + 1))
-        term.setCursorPos(x, y)
-        term.write(input)
-        local e, char = os.pullEvent()
-        if e == "char" then
-            if isCorrectChar(char) then
-                input = input .. char
-            end
-        elseif e == "key" then
-            if char == keys.backspace then
-                input = input:sub(1, -2)
-            elseif char == keys.enter then
-                return tonumber(loadstring("return " .. input)()) or 0
-            elseif char == keys.leftShift then
-                shiftHeld = true
-            end
-        elseif e == "key_up" and char == keys.leftShift then
-            shiftHeld = false
-        elseif e == "mouse_scroll" then
-            local scrollAmount = ((shiftHeld and 8) or 1) * -char
-            local newValue = math.max(scrollAmount + (tonumber(input) or 0), 0)
-            newValue = math.ceil(newValue / scrollAmount) * scrollAmount
-            input = tostring(newValue)
-        elseif e == "mouse_click" then
-            if char == 1 then
-                return tonumber(input) or 0
-            elseif char == 2 then
-                return 0
-            end
-        end
+  ---@type string
+  input = tostring(input)
+  local shiftHeld = false
+  local x, y = term.getCursorPos()
+  while true do
+    term.setCursorPos(x, y)
+    term.write((" "):rep(#input + 1))
+    term.setCursorPos(x, y)
+    term.write(input)
+    local e, char = os.pullEvent()
+    if e == "char" then
+      if isCorrectChar(char) then
+        input = input .. char
+      end
+    elseif e == "key" then
+      if char == keys.backspace then
+        input = input:sub(1, -2)
+      elseif char == keys.enter then
+        return tonumber(loadstring("return " .. input)()) or 0
+      elseif char == keys.leftShift then
+        shiftHeld = true
+      end
+    elseif e == "key_up" and char == keys.leftShift then
+      shiftHeld = false
+    elseif e == "mouse_scroll" then
+      local scrollAmount = ((shiftHeld and 8) or 1) * -char
+      local newValue = math.max(scrollAmount + (tonumber(input) or 0), 0)
+      newValue = math.ceil(newValue / scrollAmount) * scrollAmount
+      input = tostring(newValue)
+    elseif e == "mouse_click" then
+      if char == 1 then
+        return tonumber(input) or 0
+      elseif char == 2 then
+        return 0
+      end
     end
   end
 end
 
 function INFO(item)
-    mode = "INFO"
-    --local itemAmount = math.min(item.maxCount, item.count)
-    local itemAmount = ""
-    draw(function()
-        setColors(headerFg, headerBg)
-        clearLine(2)
-        text(1, 2, ("%u x %s"):format(item.count, item.displayName))
-        setColors(mainFg, mainBg)
-        text(1, 3, item.name)
-        text(1, 4, item.nbt)
-        if item.enchantments then
-            text(1, 5, "Enchantments")
-            for k, v in ipairs(item.enchantments) do
-                text(1, 5 + k, v.displayName or v.name)
-            end
-        end
-        text(1, h, "Withdraw: ")
-        display.setCursorBlink(true)
-    end)
-    itemAmount = scroll_read(itemAmount)
-    requestItem(false, item, tonumber(itemAmount or 0))
-    return SEARCH()
+  mode = "INFO"
+  --local itemAmount = math.min(item.maxCount, item.count)
+  local itemAmount = ""
+  draw(function()
+    setColors(headerFg, headerBg)
+    clearLine(2)
+    text(1, 2, ("%u x %s"):format(item.count, item.displayName))
+    setColors(mainFg, mainBg)
+    text(1, 3, item.name)
+    text(1, 4, item.nbt)
+    if item.enchantments then
+      text(1, 5, "Enchantments")
+      for k, v in ipairs(item.enchantments) do
+        text(1, 5 + k, v.displayName or v.name)
+      end
+    end
+    text(1, h, "Withdraw: ")
+    display.setCursorBlink(true)
+  end)
+  itemAmount = scroll_read(itemAmount)
+  requestItem(false, item, tonumber(itemAmount or 0))
+  return SEARCH()
 end
 
 function REQUEST(item)

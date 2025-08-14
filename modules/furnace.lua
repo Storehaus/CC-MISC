@@ -39,7 +39,7 @@ return {
 
     local function saveFurnaceRecipes()
       local f = assert(fs.open("recipes/furnace_recipes.bin", "wb"))
-      f.write("FURNACE0")       -- "versioned"
+      f.write("FURNACE0") -- "versioned"
       for k, v in pairs(recipes) do
         structFurnaceRecipe:writeHandle(f, {
           input = crafting.getOrCacheString(v),
@@ -73,36 +73,36 @@ return {
       saveFurnaceRecipes()
     end
 
-        crafting.addJsonTypeHandler("minecraft:smelting", jsonTypeHandler)
+    crafting.addJsonTypeHandler("minecraft:smelting", jsonTypeHandler)
 
-        ---Get a fuel for an item, and how many items is optimal if toSmelt is provided
-        ---@param toSmelt integer? ensure there's enough of this fuel to smelt this many items
-        ---@return string fuel
-        ---@return integer multiple
-        ---@return integer optimal
-        local function getFuel(toSmelt)
-            ---@type {diff:integer,fuel:string,optimal:integer,multiple:integer}[]
-            local fuelDiffs = {}
-            for k, v in pairs(config.furnace.fuels.value) do
-                -- measure the difference in terms of
-                -- how far off the closest multiple of the fuel is from the desired amount
-                local multiple = v.smelts
-                local optimal = math.ceil((toSmelt or 0) / multiple) * multiple
-                if loaded.inventory.interface.getCount(k) >= optimal / multiple then
-                    fuelDiffs[#fuelDiffs + 1] = {
-                        diff = optimal - toSmelt,
-                        optimal = optimal,
-                        fuel = k,
-                        multiple = multiple
-                    }
-                end
-            end
-            table.sort(fuelDiffs, function(a, b)
-                return a.diff < b.diff
-            end)
-            -- TODO: Replace this hack with a proper optimizer that respects what is in storage.
-            return fuelDiffs[1].fuel, fuelDiffs[1].multiple, toSmelt -- fuelDiffs[1].optimal
+    ---Get a fuel for an item, and how many items is optimal if toSmelt is provided
+    ---@param toSmelt integer? ensure there's enough of this fuel to smelt this many items
+    ---@return string fuel
+    ---@return integer multiple
+    ---@return integer optimal
+    local function getFuel(toSmelt)
+      ---@type {diff:integer,fuel:string,optimal:integer,multiple:integer}[]
+      local fuelDiffs = {}
+      for k, v in pairs(config.furnace.fuels.value) do
+        -- measure the difference in terms of
+        -- how far off the closest multiple of the fuel is from the desired amount
+        local multiple = v.smelts
+        local optimal = math.ceil((toSmelt or 0) / multiple) * multiple
+        if loaded.inventory.interface.getCount(k) >= optimal / multiple then
+          fuelDiffs[#fuelDiffs + 1] = {
+            diff = optimal - toSmelt,
+            optimal = optimal,
+            fuel = k,
+            multiple = multiple
+          }
         end
+      end
+      table.sort(fuelDiffs, function(a, b)
+        return a.diff < b.diff
+      end)
+      -- TODO: Replace this hack with a proper optimizer that respects what is in storage.
+      return fuelDiffs[1].fuel, fuelDiffs[1].multiple, toSmelt       -- fuelDiffs[1].optimal
+    end
 
     ---@class FurnaceNode : CraftingNode
     ---@field type "furnace"
