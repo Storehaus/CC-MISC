@@ -1,9 +1,15 @@
 ---@class modules.chatbox
 ---@field interface modules.chatbox.interface
+hopper = require("/rom/programs/hopper")
 return {
     id = "chatbox",
     version = "1.0.0",
     config = {
+        useEnderChestDeposit = {
+            default = false,
+            description = "Items within vanilla enderchest will automatically be deposited into storage",
+            type = "boolean",
+        },
         whitelist = {
             default = {},
             description =
@@ -32,7 +38,7 @@ return {
     },
     ---@param loaded {inventory: modules.inventory, introspection: modules.introspection}
     init = function(loaded, config)
-        sleep(1)
+           sleep(1)
         assert(chatbox and chatbox.isConnected(), "This module requires a registered chatbox.")
         local function sendMessage(user, message, ...)
             chatbox.tell(user, message:format(...), config.chatbox.name.value, nil, "format")
@@ -77,10 +83,16 @@ return {
                     sendMessage(user, "usage: withdraw [name] <count> <nbt>")
                 end
                 local periph = peripheral.wrap(introspection) --[[@as table]]
+                local ogItem = args[1]
                 args[1] = getBestMatch(loaded.inventory.interface.listNames(), args[1])
-                local count = loaded.inventory.interface.pushItems(false, periph.getInventory(), args[1],
-                    tonumber(args[2]), nil, args[3], { allowBadTransfers = true })
-                sendMessage(user, "Pushed &9%s &f%s.", count, args[1])
+
+                if args[1] ~= nil then
+                    local count = loaded.inventory.interface.pushItems(false, periph.getInventory(), args[1],
+                        tonumber(args[2]), nil, args[3], { allowBadTransfers = true })
+                    sendMessage(user, "Pushed &9%s &f%s.", count, args[1])
+                else
+                    sendMessage(user,"%s not found",ogItem)
+                end
             end,
             balance = function(user, args)
                 if #args < 1 then
@@ -128,13 +140,44 @@ return {
                 end
                 sendMessage(user, ms)
             end
+
         }
+
+
+
+        function depositIntoEnderChest(user)
+            local introspection = getIntrospection(user)
+            local enderChest = peripheral.wrap(introspection).getEnder()
+            for i=1,enderChest.size(),1 do
+                loaded.inventory.interface.performTransfer()
+                if enderChest.getItemDetail(i) == nil then
+                    goto continue
+                end
+                loaded.inventory.interface.pullItems(false, enderChest, i, nil, nil, nil, { optimal = true })
+               --loaded.inventory.interface.pullItems(false, enderChest,i, 64)
+               loaded.inventory.interface.performTransfer()
+
+                ::continue::
+
+            end
+            sendMessage(user,"Ender Chest deposited")
+        end
+
+
         ---@class modules.chatbox.interface
         return {
             start = function()
+                if config.chatbox.useEnderChestDeposit.value then
+                    commands["enderdeposit"] = function(user,args)
+                        depositIntoEnderChest(user)
+                    end
+                end
                 while true do
                     local event, user, command, args, data = os.pullEvent("command")
                     local verified = data.ownerOnly
+
+
+
                     if not verified and config.chatbox.whitelist.value[user] then
                         verified = true
                     end
