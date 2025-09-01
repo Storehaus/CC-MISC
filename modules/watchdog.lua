@@ -11,7 +11,7 @@ return {
     timeout = {
       type = "number",
       description = "How long without any activity before the system resets. Measured in ticks",
-      default = 20 * 30,
+      default = 20*30,
     },
     enabled = {
       type = "boolean",
@@ -19,7 +19,7 @@ return {
       default = false
     }
   },
-  setup = function(moduleConfig)
+  setup = function (moduleConfig)
     local watchdogLib = require '.watchdogLib'
     print("Autodetecting watch dog")
     local wd_side = watchdogLib.autodetectWatcdogSide()
