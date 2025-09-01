@@ -25,35 +25,19 @@ return {
   ---@param loaded {inventory: modules.inventory}
   init = function(loaded, config)
     local function dumbImport(periph, slots, rule)
-      if not slots then       -- even DUMBER import (and faster!)
-        local list = periph.list and periph.list() or {}
-        local nameLUT = {}
-        for _, stack in pairs(list) do
-          if stack and stack.name then
-            nameLUT[stack.name] = true
-          end
-        end
-        for name in pairs(nameLUT) do
-          print("importing " .. name)
-          loaded.inventory.interface.pullItems(true, rule.inventory, name, 36 * 84)
-        end
-        return
-      end
-
       if not periph.list then
         for _, slot in ipairs(slots) do
-          loaded.inventory.interface.pullItems(false, rule.inventory, slot)
+          loaded.inventory.interface.pullItems(true, rule.inventory, slot)
         end
       else
         local list = periph.list()
         for _, slot in ipairs(slots) do
           if list[slot] then
-            loaded.inventory.interface.pullItems(false, rule.inventory, slot)
+            loaded.inventory.interface.pullItems(true, rule.inventory, slot)
           end
         end
       end
     end
-
     local function smartImport(periph, slots, rule)
       local wllut
       if rule.whitelist then
@@ -76,10 +60,10 @@ return {
           local moved
           local name = list[slot].name
           if wllut and wllut[name] then
-            loaded.inventory.interface.pullItems(false, rule.inventory, slot)
+            loaded.inventory.interface.pullItems(true, rule.inventory, slot)
             moved = true
           elseif not (wllut or bllut[name]) then
-            loaded.inventory.interface.pullItems(false, rule.inventory, slot)
+            loaded.inventory.interface.pullItems(true, rule.inventory, slot)
             moved = true
           end
           if remaining and moved then
@@ -103,14 +87,9 @@ return {
       end
       if not (rule.whitelist or rule.blacklist or rule.min) then
         -- nice and simple
-        if not rule.slots then
-          dumbImport(periph, nil, rule)
-        else
-          dumbImport(periph, slots, rule)
-        end
+        dumbImport(periph, slots, rule)
         return
       end
-
       smartImport(periph, slots, rule)
     end
 
@@ -140,11 +119,10 @@ return {
           if remaining < 1 then
             return
           end
-          local moved = loaded.inventory.interface.pushItems(false, rule.inventory, rule.name, remaining, slot,
-            rule.nbt)
+          local moved = loaded.inventory.interface.pushItems(false, rule.inventory, rule.name, remaining, slot, rule.nbt)
           remaining = remaining - moved
         else
-          loaded.inventory.interface.pushItems(false, rule.inventory, rule.name, nil, slot, rule.nbt)
+          loaded.inventory.interface.pushItems(true, rule.inventory, rule.name, nil, slot, rule.nbt)
         end
       end
     end
@@ -158,7 +136,7 @@ return {
     return {
       start = function()
         while true do
-          sleep(0.05)
+          sleep(config.io.delay.value)
           processImports()
           processExports()
         end

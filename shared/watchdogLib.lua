@@ -1,25 +1,23 @@
 -- Watch Dog code is here for clients to be able to use it
 if not settings.getDetails("misc.watchdogEnabled") then
-  settings.define("misc.watchdogEnabled",
-    { description = "Enable the Watch Dog from Tom's Peripherals", type = "boolean" })
+  settings.define("misc.watchdogEnabled", { description = "Enable the Watch Dog from Tom's Peripherals", type = "boolean" })
   settings.save()
 end
 
 if not settings.getDetails("misc.watchdogSide") then
-  settings.define("misc.watchdogSide",
-    { description = "Side that the Watch Dog is on", type = "string", default = "auto" })
+  settings.define("misc.watchdogSide", { description = "Side that the Watch Dog is on", type = "string", default = "auto"})
   settings.save()
 end
 
 ---Determin the watch dog side
 ---@return string|nil
 local function autodetectWatcdogSide()
-  local watchdogp = peripheral.getName(peripheral.find("tm_wdt", function(wd_name, _)
-    -- If the name does not contain tm_wdt then it's directly attached.
-    if string.find(wd_name, 'tm_wdt') == nil then
-      return true
-    end
-  end)
+  local watchdogp = peripheral.getName(peripheral.find("tm_wdt", function (wd_name, _)
+      -- If the name does not contain tm_wdt then it's directly attached.
+      if string.find(wd_name, 'tm_wdt') == nil then
+        return true
+      end
+    end)
   )
   -- TODO: Make this able to handle having multiple watchdogs attached.
   if watchdogp ~= nil then
@@ -87,7 +85,7 @@ local function watchdogLoopFromSettings(allowSetup)
   if allowSetup then
     if settings.get("misc.watchdogEnabled") == nil then
       local completion = require "cc.completion"
-      local options = { "yes", "no" }
+      local options = {"yes", "no"}
       print("Do you want to enable the watch dog?")
       write("> ")
       local resp = read(nil, nil, function(text) return completion.choice(text, options) end)
@@ -110,9 +108,7 @@ local function watchdogLoopFromSettings(allowSetup)
 end
 
 
-return {
-  watchdogEnabled = watchdogEnabled,
-  autodetectWatcdogSide = autodetectWatcdogSide,
-  watchdogLoop = watchdogLoop,
-  watchdogLoopFromSettings = watchdogLoopFromSettings
-}
+return {watchdogEnabled = watchdogEnabled,
+        autodetectWatcdogSide = autodetectWatcdogSide,
+        watchdogLoop = watchdogLoop,
+        watchdogLoopFromSettings = watchdogLoopFromSettings}

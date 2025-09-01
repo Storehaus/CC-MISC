@@ -8,8 +8,7 @@ if not settings.get("misc.monitor") then
 end
 local wirelessMode = fs.exists("websocketLib.lua")
 if wirelessMode and not settings.get("misc.websocketURL") then
-  settings.define("misc.websocketURL",
-    { description = "URL of the websocket to use for wireless communication", type = "string" })
+  settings.define("misc.websocketURL",{ description = "URL of the websocket to use for wireless communication", type = "string" })
   print("Enter the URL of the websocket relay service you would like to use.")
   settings.set("misc.websocketURL", read())
   settings.save()
@@ -85,12 +84,12 @@ end
 writeUsage()
 
 local watchdogAvaliable = fs.exists("watchdogLib.lua")
-local funcs = { lib.subscribe, handleUpdates }
+local funcs = {lib.subscribe, handleUpdates}
 if watchdogAvaliable then
   local watchdogLib = require '.watchdogLib'
   local wdFunc = watchdogLib.watchdogLoopFromSettings()
   if wdFunc ~= nil then
-    funcs[#funcs + 1] = wdFunc
+      funcs[#funcs+1] = wdFunc
   end
 end
 parallel.waitForAny(table.unpack(funcs))
