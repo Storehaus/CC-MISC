@@ -250,7 +250,7 @@ local function deepCloneNoFunc(t)
 end
 
 local function saveConfig()
-  common.saveTableToFile("config.txt", deepCloneNoFunc(config), false, true)
+  common.saveTableToFile("config.lua", deepCloneNoFunc(config), false, true)
 end
 saveConfig()
 
