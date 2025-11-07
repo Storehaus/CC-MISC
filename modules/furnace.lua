@@ -100,7 +100,7 @@ return {
                 return a.diff < b.diff
             end)
             -- TODO: Replace this hack with a proper optimizer that respects what is in storage.
-            return fuelDiffs[1].fuel, fuelDiffs[1].multiple, toSmelt -- fuelDiffs[1].optimal
+            return fuelDiffs[1].fuel, fuelDiffs[1].multiple, fuelDiffs[1].optimal
         end
 
         ---@class FurnaceNode : CraftingNode
@@ -141,7 +141,7 @@ return {
             node.multiple = multiple
             node.smelting = {}
             node.fuelNeeded = {}
-            node.children = crafting.craft(fuel --[[@as string]], math.floor(toCraft / multiple), node.jobId, false,
+            node.children = crafting.craft(fuel --[[@as string]], math.ceil(toCraft / multiple), node.jobId, false,
                 requestChain)
             return true
         end
@@ -159,7 +159,7 @@ return {
                 while remaining > 0 do
                     for furnace = 1, #attachedFurnaces do
                         usedFurances[furnace] = true
-                        local toAssign = node.multiple
+                        local toAssign = math.min(remaining, node.multiple)
                         local fuelNeeded = math.floor(toAssign / node.multiple)
                         local absFurnace = require("abstractInvLib")({ attachedFurnaces[furnace] })
                         local fmoved = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelNeeded, 2)
@@ -205,6 +205,12 @@ return {
                     if i > 0 then
                         node.hasBucket = false
                     end
+                end
+                
+                -- Return completed furnaces to available pool
+                if node.smelting[furnace] <= 0 and node.fuelNeeded[furnace] <= 0 then
+                    table.insert(attachedFurnaces, furnace)
+                    node.smelting[furnace] = nil
                 end
                 if remaining > 0 then
                     local amount = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, remaining, 1)
