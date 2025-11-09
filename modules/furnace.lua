@@ -89,7 +89,7 @@ return {
                 local optimal = math.ceil((toSmelt or 0) / multiple) * multiple
                 if loaded.inventory.interface.getCount(k) >= optimal / multiple then
                     fuelDiffs[#fuelDiffs + 1] = {
-                        diff = optimal - toSmelt,
+                        diff = optimal - (toSmelt or 0),
                         optimal = optimal,
                         fuel = k,
                         multiple = multiple
@@ -99,7 +99,6 @@ return {
             table.sort(fuelDiffs, function(a, b)
                 return a.diff < b.diff
             end)
-            -- TODO: Replace this hack with a proper optimizer that respects what is in storage.
             return fuelDiffs[1].fuel, fuelDiffs[1].multiple, fuelDiffs[1].optimal
         end
 
@@ -153,89 +152,107 @@ return {
 
         ---@param node FurnaceNode
         local function readyHandler(node)
-            local usedFurances = {}
+            local usedFurnaces = {}
             local remaining = node.count
             if #attachedFurnaces > 0 then
                 while remaining > 0 do
-                    for furnace = 1, #attachedFurnaces do
-                        usedFurances[furnace] = true
+                    for furnaceIdx = 1, #attachedFurnaces do
+                        local furnaceName = attachedFurnaces[furnaceIdx]
+                        usedFurnaces[furnaceName] = true
+
                         local toAssign = math.min(remaining, node.multiple)
-                        local fuelNeeded = math.floor(toAssign / node.multiple)
-                        local absFurnace = require("abstractInvLib")({ attachedFurnaces[furnace] })
+                        local fuelNeeded = math.ceil(toAssign / node.multiple)
+
+                        local absFurnace = require("abstractInvLib")({ furnaceName })
+
+                        -- Move fuel first
                         local fmoved = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelNeeded, 2)
-                        local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign,
-                            1)
-                        node.smelting[attachedFurnaces[furnace]] = (node.smelting[furnace] or 0) + toAssign - moved
-                        node.fuelNeeded[attachedFurnaces[furnace]] = (node.fuelNeeded[furnace] or 0) + fuelNeeded -
-                            fmoved
-                        node.hasBucket = true
-                        remaining = remaining - toAssign
-                        if remaining == 0 then
+                        -- Then move items
+                        local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign, 1)
+
+                        -- Update tracking
+                        node.smelting[furnaceName] = (node.smelting[furnaceName] or 0) + (toAssign - moved)
+                        node.fuelNeeded[furnaceName] = (node.fuelNeeded[furnaceName] or 0) + (fuelNeeded - fmoved)
+                        remaining = remaining - moved
+
+                        -- Handle bucket fuels
+                        if config.furnace.fuels.value[node.fuel].bucket and fmoved > 0 then
+                            node.hasBucket = true
+                        end
+
+                        if remaining <= 0 then break end
+                    end
+                    if remaining <= 0 then break end
+                end
+
+                -- Remove used furnaces from active list
+                for furnaceName in pairs(usedFurnaces) do
+                    for i = #attachedFurnaces, 1, -1 do
+                        if attachedFurnaces[i] == furnaceName then
+                            table.remove(attachedFurnaces, i)
                             break
                         end
                     end
                 end
-                local ordered = {}
-                for k, v in pairs(usedFurances) do
-                    ordered[#ordered + 1] = k
-                end
-                table.sort(ordered)
-                for i = #ordered, 1, -1 do
-                    table.remove(attachedFurnaces, ordered[i])
-                end
+
                 crafting.changeNodeState(node, "CRAFTING")
                 smelting[node] = node
             end
         end
         crafting.addReadyHandler("furnace", readyHandler)
 
-        local function craftingHandler(node)
-
-        end
-        crafting.addCraftingHandler("furnace", craftingHandler)
-
         ---@param node FurnaceNode
         local function checkNodeFurnaces(node)
             for furnace, remaining in pairs(node.smelting) do
                 local absFurnace = require("abstractInvLib")({ furnace })
-                local crafted = loaded.inventory.interface.pullItems(false, absFurnace, 3)
+                
+                -- Pull completed items first
+                local crafted = loaded.inventory.interface.pullItems(absFurnace, false, 3, node.count - node.done)
                 node.done = node.done + crafted
+
+                -- Handle bucket recovery if needed
                 if config.furnace.fuels.value[node.fuel].bucket and node.hasBucket then
-                    local i = loaded.inventory.interface.pullItems(false, absFurnace, 2)
-                    if i > 0 then
+                    local bucketMoved = loaded.inventory.interface.pullItems(absFurnace, false, 2)
+                    if bucketMoved > 0 then
                         node.hasBucket = false
                     end
                 end
-                
+
+                -- Process remaining items and fuel
                 if remaining > 0 then
                     local amount = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, remaining, 1)
                     node.smelting[furnace] = remaining - amount
                 end
+                
                 if node.fuelNeeded[furnace] > 0 then
-                    local famount = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel,
-                        node.fuelNeeded[furnace], 2)
-                    if famount == 0 and config.furnace.fuels.value[node.fuel].bucket then
-                        -- remove the bucket
-                        loaded.inventory.interface.pullItems(true, absFurnace, 2)
-                    end
+                    local famount = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, node.fuelNeeded[furnace], 2)
                     node.fuelNeeded[furnace] = node.fuelNeeded[furnace] - famount
-                end
-            end
-            if node.done == node.count then
-                -- Cleanup all furnaces for this job
-                for furnace in pairs(node.smelting) do
-                    local absFurnace = require("abstractInvLib")({ furnace })
-                    -- Final pull attempt
-                    loaded.inventory.interface.pullItems(absFurnace, false, 3)
-                    -- Bucket cleanup if needed
-                    if config.furnace.fuels.value[node.fuel].bucket then
+                    
+                    -- Clean empty buckets if fuel was bucket-based
+                    if famount == 0 and config.furnace.fuels.value[node.fuel].bucket then
                         loaded.inventory.interface.pullItems(absFurnace, false, 2)
                     end
-                    -- Return to available pool
-                    table.insert(attachedFurnaces, furnace)
                 end
+
+                -- Check if furnace can be recycled
+                if node.smelting[furnace] <= 0 and node.fuelNeeded[furnace] <= 0 then
+                    -- Final check if furnace is truly empty
+                    local input = loaded.inventory.interface.getItem(absFurnace, 1)
+                    local fuel = loaded.inventory.interface.getItem(absFurnace, 2)
+                    local output = loaded.inventory.interface.getItem(absFurnace, 3)
+                    
+                    if not input and not fuel and not output then
+                        table.insert(attachedFurnaces, furnace)
+                        node.smelting[furnace] = nil
+                        node.fuelNeeded[furnace] = nil
+                    end
+                end
+            end
+
+            -- Final completion check
+            if node.done >= node.count then
                 crafting.changeNodeState(node, "DONE")
-                smelting[node] = nil  -- Stop tracking this job
+                smelting[node] = nil
             end
         end
 
