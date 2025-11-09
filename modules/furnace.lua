@@ -198,11 +198,11 @@ return {
         local function checkNodeFurnaces(node)
             for furnace, remaining in pairs(node.smelting) do
                 local absFurnace = require("abstractInvLib")({ furnace })
-                local crafted = loaded.inventory.interface.pullItems(absFurnace, false, 3)
+                local crafted = loaded.inventory.interface.pullItems(false, absFurnace, 3)
                 node.done = node.done + crafted
                 if config.furnace.fuels.value[node.fuel].bucket and node.hasBucket then
-                    local bucketMoved = loaded.inventory.interface.pullItems(absFurnace, false, 2)
-                    if bucketMoved > 0 then
+                    local i = loaded.inventory.interface.pullItems(false, absFurnace, 2)
+                    if i > 0 then
                         node.hasBucket = false
                     end
                 end
@@ -220,7 +220,7 @@ return {
                     local famount = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel,
                         node.fuelNeeded[furnace], 2)
                     if famount == 0 and config.furnace.fuels.value[node.fuel].bucket then
-                        -- Clean up empty buckets
+                        -- remove the bucket
                         loaded.inventory.interface.pullItems(true, absFurnace, 2)
                     end
                     node.fuelNeeded[furnace] = node.fuelNeeded[furnace] - famount
