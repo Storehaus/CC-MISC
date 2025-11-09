@@ -207,11 +207,6 @@ return {
                     end
                 end
                 
-                -- Return completed furnaces to available pool
-                if node.smelting[furnace] <= 0 and node.fuelNeeded[furnace] <= 0 then
-                    table.insert(attachedFurnaces, furnace)
-                    node.smelting[furnace] = nil
-                end
                 if remaining > 0 then
                     local amount = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, remaining, 1)
                     node.smelting[furnace] = remaining - amount
@@ -227,7 +222,20 @@ return {
                 end
             end
             if node.done == node.count then
+                -- Cleanup all furnaces for this job
+                for furnace in pairs(node.smelting) do
+                    local absFurnace = require("abstractInvLib")({ furnace })
+                    -- Final pull attempt
+                    loaded.inventory.interface.pullItems(absFurnace, false, 3)
+                    -- Bucket cleanup if needed
+                    if config.furnace.fuels.value[node.fuel].bucket then
+                        loaded.inventory.interface.pullItems(absFurnace, false, 2)
+                    end
+                    -- Return to available pool
+                    table.insert(attachedFurnaces, furnace)
+                end
                 crafting.changeNodeState(node, "DONE")
+                smelting[node] = nil  -- Stop tracking this job
             end
         end
 
