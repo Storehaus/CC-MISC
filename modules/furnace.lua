@@ -200,7 +200,12 @@ return {
             end
         end
         crafting.addReadyHandler("furnace", readyHandler)
-
+        
+        local function craftingHandler(node)
+        
+        end
+        crafting.addCraftingHandler("furnace", craftingHandler)
+        
         ---@param node FurnaceNode
         local function checkNodeFurnaces(node)
             for furnace, remaining in pairs(node.smelting) do
