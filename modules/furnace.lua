@@ -198,36 +198,46 @@ return {
 
         ---@param node FurnaceNode
         local function checkNodeFurnaces(node)
-            for furnace, remaining in pairs(node.smelting) do
+            for furnace in pairs(node.smelting) do
                 local absFurnace = require("abstractInvLib")({ furnace })
+
+                -- Pull out finished product
                 local crafted = loaded.inventory.interface.pullItems(false, absFurnace, 3)
                 node.done = node.done + crafted
+
+                -- Pull out bucket if needed
                 if config.furnace.fuels.value[node.fuel].bucket and node.hasBucket then
                     local i = loaded.inventory.interface.pullItems(false, absFurnace, 2)
                     if i > 0 then
                         node.hasBucket = false
                     end
                 end
-                
-                -- Return completed furnaces to available pool
-                if node.smelting[furnace] <= 0 and node.fuelNeeded[furnace] <= 0 then
-                    table.insert(attachedFurnaces, furnace)
-                    node.smelting[furnace] = nil
-                end
+
+                -- Try to refill ingredient
+                local remaining = node.smelting[furnace]
                 if remaining > 0 then
                     local amount = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, remaining, 1)
                     node.smelting[furnace] = remaining - amount
                 end
-                if node.fuelNeeded[furnace] > 0 then
-                    local famount = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel,
-                        node.fuelNeeded[furnace], 2)
+
+                -- Try to refill fuel
+                local fuelLeft = node.fuelNeeded[furnace]
+                if fuelLeft > 0 then
+                    local famount = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelLeft, 2)
                     if famount == 0 and config.furnace.fuels.value[node.fuel].bucket then
-                        -- remove the bucket
                         loaded.inventory.interface.pullItems(true, absFurnace, 2)
                     end
-                    node.fuelNeeded[furnace] = node.fuelNeeded[furnace] - famount
+                    node.fuelNeeded[furnace] = fuelLeft - famount
+                end
+
+                -- Check if this furnace is done
+                if node.smelting[furnace] <= 0 and node.fuelNeeded[furnace] <= 0 then
+                    table.insert(attachedFurnaces, furnace)
+                    node.smelting[furnace] = nil
+                    node.fuelNeeded[furnace] = nil
                 end
             end
+
             if node.done == node.count then
                 crafting.changeNodeState(node, "DONE")
             end
