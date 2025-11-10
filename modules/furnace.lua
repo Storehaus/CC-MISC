@@ -1,4 +1,5 @@
 --- Furnace crafting recipe handler
+-- 2 laptops from an AI cluster were sacrificed in fixing of this code
 ---@class modules.furnace
 return {
     id = "furnace",
@@ -161,23 +162,17 @@ return {
                 while remaining > 0 and furnaceIndex <= #attachedFurnaces do
                     local furnace = attachedFurnaces[furnaceIndex]
                     usedFurances[furnaceIndex] = true
-
                     local toAssign = math.min(node.multiple, remaining)
                     local fuelNeeded = math.ceil(toAssign / node.multiple)
                     local absFurnace = require("abstractInvLib")({ furnace })
-
                     local fmoved = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelNeeded, 2)
                     local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign, 1)
-
                     node.smelting[furnace] = (node.smelting[furnace] or 0) + toAssign - moved
                     node.fuelNeeded[furnace] = (node.fuelNeeded[furnace] or 0) + fuelNeeded - fmoved
                     node.hasBucket = true
-
                     remaining = remaining - toAssign
                     furnaceIndex = furnaceIndex + 1
                 end
-
-
                 local ordered = {}
                 for k, v in pairs(usedFurances) do
                     ordered[#ordered + 1] = k
