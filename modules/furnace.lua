@@ -198,18 +198,14 @@ return {
 
         ---@param node FurnaceNode
         local function checkNodeFurnaces(node)
-            local allDone = true
-
             for furnace in pairs(node.smelting) do
                 local absFurnace = require("abstractInvLib")({ furnace })
 
-                -- Always try to pull finished items
+                -- Pull out finished product
                 local crafted = loaded.inventory.interface.pullItems(false, absFurnace, 3)
-                if crafted > 0 then
-                    node.done = node.done + crafted
-                end
+                node.done = node.done + crafted
 
-                -- Always try to pull bucket if needed
+                -- Pull out bucket if needed
                 if config.furnace.fuels.value[node.fuel].bucket and node.hasBucket then
                     local i = loaded.inventory.interface.pullItems(false, absFurnace, 2)
                     if i > 0 then
@@ -217,14 +213,14 @@ return {
                     end
                 end
 
-                -- Refill ingredient if needed
+                -- Try to refill ingredient
                 local remaining = node.smelting[furnace]
                 if remaining > 0 then
-                    local pushed = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, remaining, 1)
-                    node.smelting[furnace] = remaining - pushed
+                    local amount = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, remaining, 1)
+                    node.smelting[furnace] = remaining - amount
                 end
 
-                -- Refill fuel if needed
+                -- Try to refill fuel
                 local fuelLeft = node.fuelNeeded[furnace]
                 if fuelLeft > 0 then
                     local famount = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelLeft, 2)
@@ -235,35 +231,17 @@ return {
                 end
 
                 -- Check if this furnace is done
-                local stillSmelting = node.smelting[furnace] > 0 or node.fuelNeeded[furnace] > 0
-                if not stillSmelting then
-                    -- Pull again to catch any late items
-                    local extra = loaded.inventory.interface.pullItems(false, absFurnace, 3)
-                    if extra > 0 then
-                        node.done = node.done + extra
-                    end
-
+                if node.smelting[furnace] <= 0 and node.fuelNeeded[furnace] <= 0 then
                     table.insert(attachedFurnaces, furnace)
                     node.smelting[furnace] = nil
                     node.fuelNeeded[furnace] = nil
-                else
-                    allDone = false
                 end
             end
 
-            if allDone and node.done >= node.count then
-                -- Final sweep: pull one last time from all furnaces
-                for furnace in pairs(node.smelting) do
-                    local absFurnace = require("abstractInvLib")({ furnace })
-                    local final = loaded.inventory.interface.pullItems(false, absFurnace, 3)
-                    if final > 0 then
-                        node.done = node.done + final
-                    end
-                end
+            if node.done == node.count then
                 crafting.changeNodeState(node, "DONE")
             end
         end
-
 
         local function furnaceChecker()
             while true do
