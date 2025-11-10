@@ -128,23 +128,24 @@ return {
         ---@return boolean
         local function craftType(node, name, count, requestChain)
             local requires = recipes[name]
-            if not requires then
-                return false
-            end
-            local fuel, multiple, toCraft = getFuel(count) --[[@as integer]]
+            if not requires then return false end
+
+            local fuel, multiple = getFuel(count)
             node.type = "furnace"
-            node.count = toCraft
+            node.count = count
             node.done = 0
-            node.children = crafting.craft(requires, toCraft, node.jobId, nil, requestChain)
             node.ingredient = requires
-            node.fuel = fuel --[[@as string]]
+            node.fuel = fuel
             node.multiple = multiple
             node.smelting = {}
             node.fuelNeeded = {}
-            node.children = crafting.craft(fuel --[[@as string]], math.floor(toCraft / multiple), node.jobId, false,
-                requestChain)
+
+            node.children = crafting.craft(requires, count, node.jobId, nil, requestChain)
+            node.children = crafting.craft(fuel, math.ceil(count / multiple), node.jobId, false, requestChain)
+
             return true
         end
+
         crafting.addCraftType("furnace", craftType)
 
 
@@ -175,6 +176,7 @@ return {
                     remaining = remaining - toAssign
                     furnaceIndex = furnaceIndex + 1
                 end
+
 
                 local ordered = {}
                 for k, v in pairs(usedFurances) do
