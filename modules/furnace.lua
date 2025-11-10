@@ -158,16 +158,17 @@ return {
             if #attachedFurnaces > 0 then
                 while remaining > 0 do
                     for furnace = 1, #attachedFurnaces do
-                        usedFurances[furnace] = true
+                        local furnaceName = attachedFurnaces[furnace]
+                        usedFurances[furnaceName] = true
                         local toAssign = math.min(remaining, node.multiple)
                         local fuelNeeded = math.floor(toAssign / node.multiple)
-                        local absFurnace = require("abstractInvLib")({ attachedFurnaces[furnace] })
+                        local absFurnace = require("abstractInvLib")({ furnaceName })
                         local fmoved = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelNeeded, 2)
-                        local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign,
-                            1)
-                        node.smelting[attachedFurnaces[furnace]] = (node.smelting[furnace] or 0) + toAssign - moved
-                        node.fuelNeeded[attachedFurnaces[furnace]] = (node.fuelNeeded[furnace] or 0) + fuelNeeded -
-                            fmoved
+                        local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign, 1)
+                        
+                        node.smelting[furnaceName] = (node.smelting[furnaceName] or 0) + toAssign - moved
+                        node.fuelNeeded[furnaceName] = (node.fuelNeeded[furnaceName] or 0) + fuelNeeded - fmoved
+                        
                         node.hasBucket = true
                         remaining = remaining - toAssign
                         if remaining == 0 then
@@ -175,14 +176,15 @@ return {
                         end
                     end
                 end
-                local ordered = {}
-                for k, v in pairs(usedFurances) do
-                    ordered[#ordered + 1] = k
+                for k in pairs(usedFurances) do
+                    for i = #attachedFurnaces, 1, -1 do
+                        if attachedFurnaces[i] == k then
+                            table.remove(attachedFurnaces, i)
+                            break
+                        end
+                    end
                 end
-                table.sort(ordered)
-                for i = #ordered, 1, -1 do
-                    table.remove(attachedFurnaces, ordered[i])
-                end
+
                 crafting.changeNodeState(node, "CRAFTING")
                 smelting[node] = node
             end
