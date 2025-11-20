@@ -1,4 +1,4 @@
 -- Grab the URL from the shell args if provided
 local args = {...}
 
-print(args[1])
+print(args)
