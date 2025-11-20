@@ -1,7 +1,20 @@
-local repositoryUrl = "https://raw.githubusercontent.com/40476/CC-MISC/master/"
+-- Grab the URL from the shell args if provided
+local args = {...}
+local scriptUrl = args[1] or "https://raw.githubusercontent.com/Storehaus/CC-MISC/master/installer.lua"
 
-if ({ ... })[1] == "dev" then
-  repositoryUrl = "https://raw.githubusercontent.com/40476/CC-MISC/dev/"
+-- Derive the repository base from the script URL
+local repositoryUrl = scriptUrl:gsub("installer.lua$", "")
+
+local canonicalRepo = "https://raw.githubusercontent.com/Storehaus/CC-MISC/master/"
+
+if repositoryUrl ~= canonicalRepo then
+  term.setTextColor(colors.red)
+  print("WARNING: You are running a forked installer!")
+  print("Repo detected: " .. repositoryUrl)
+  print("Canonical repo: " .. canonicalRepo)
+  print("Press any key to continue...")
+  os.pullEvent("key")
+  term.setTextColor(colors.white)
 end
 
 local function fromURL(url)
