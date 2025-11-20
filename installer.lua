@@ -18,6 +18,7 @@ if repositoryUrl ~= canonicalRepo then
   os.pullEvent("key")
   term.setTextColor(colors.white)
 end
+exit()
 os.pullEvent("key")
 local function fromURL(url)
   return { url = url }
