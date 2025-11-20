@@ -6,7 +6,9 @@ local scriptUrl = args[1] or "https://raw.githubusercontent.com/Storehaus/CC-MIS
 local repositoryUrl = scriptUrl:gsub("installer.lua$", "")
 
 local canonicalRepo = "https://raw.githubusercontent.com/Storehaus/CC-MISC/master/"
-
+print(repositoryUrl)
+print(args[1])
+print(canonicalRepo)
 if repositoryUrl ~= canonicalRepo then
   term.setTextColor(colors.red)
   print("WARNING: You are running a forked installer!")
@@ -16,7 +18,7 @@ if repositoryUrl ~= canonicalRepo then
   os.pullEvent("key")
   term.setTextColor(colors.white)
 end
-
+os.pullEvent("key")
 local function fromURL(url)
   return { url = url }
 end
