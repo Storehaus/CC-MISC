@@ -1,15 +1,15 @@
 -- storage terminal turtle for the system
 local lib
-
+ 
 local wirelessMode = not turtle
 local turtleMode = turtle
 local inventory, invPeripheral, importStart, importEnd, pollFrequency, exportStart, exportEnd, player
-
+ 
 local mainFg = colors.white
 local mainBg = colors.black
-
+ 
 local selectBg, selectFg, menuFg, menuBg, headerFg, headerBg, searchFg, searchBg, listBg, listFg, errFg, tabFg, tabBg
-
+ 
 local function refreshTurtleInventory()
     local turtleInventory = {}
     local f = {}
@@ -21,9 +21,43 @@ local function refreshTurtleInventory()
     parallel.waitForAll(table.unpack(f))
     return turtleInventory
 end
-
+ 
 local themes = { "default", "amber", "green", "aqua", "graphite", "hotdogstand", "turtle" }
-
+ 
+local sandbox = {}
+sandbox.math = {
+    abs = math.abs,
+    acos = math.acos,
+    asin = math.asin,
+    atan = math.atan,
+    ceil = math.ceil,
+    cos = math.cos,
+    deg = math.deg,
+    exp = math.exp,
+    floor = math.floor,
+    fmod = math.fmod,
+    huge = math.huge,
+    log = math.log,
+    max = math.max,
+    min = math.min,
+    mod = math.mod,
+    pi = math.pi,
+    pow = math.pow,
+    rad = math.rad,
+    random = math.random,
+    sin = math.sin,
+    sqrt = math.sqrt,
+    tan = math.tan,
+}
+local mt = {
+    __index = function(t, k)
+        error("Attempted to access undefined variable: " .. tostring(k))
+    end,
+    __newindex = function(t, k, v)
+        error("Cannot assign to global variables")
+    end
+}
+setmetatable(sandbox, mt)
 local function firstTimeSetup()
     settings.define("misc.turtle", { description = "Should this terminal be in turtle mode?", type = "boolean" })
     settings.define("misc.websocketURL",
@@ -44,7 +78,7 @@ local function firstTimeSetup()
     })
     settings.define("misc.dropOnExport",
         { description = "If this turtle should drop items on export.", type = "boolean" })
-
+ 
     settings.set("misc.turtle", not not (turtle))
     if settings.get("misc.turtle") then
         print("Assuming turtle mode..")
@@ -73,25 +107,25 @@ local function firstTimeSetup()
     end
     settings.save()
 end
-
+ 
 local themeInfo = "The theme to use. Available themes : "
 for _, v in pairs(themes) do
     themeInfo = themeInfo .. " " .. v
 end
 settings.define("misc.theme", { description = themeInfo, type = "string", default = "default" })
-
+ 
 settings.load()
 if settings.get("misc.turtle") == nil then
     firstTimeSetup()
 end
-
-
+ 
+ 
 turtleMode = settings.get("misc.turtle")
 wirelessMode = settings.get("misc.wireless")
 player = settings.get("misc.player")
 local websocketURL = settings.get("misc.websocketURL")
 inventory = settings.get("misc.inventory")
-
+ 
 if wirelessMode then
     lib = require("websocketLib")
     lib.connect(websocketURL)
@@ -126,7 +160,7 @@ if not turtleMode then
     end
     pollFrequency = 3
 end
-
+ 
 local function processTurtleInventory()
     while true do
         os.pullEvent("do_turtle_transfers")
@@ -146,7 +180,7 @@ local function processTurtleInventory()
         lib.performTransfer()
     end
 end
-
+ 
 local function debounceTurtleInventory()
     local dropExportTimer
     while true do
@@ -162,7 +196,7 @@ local function debounceTurtleInventory()
         end
     end
 end
-
+ 
 local function inventoryPoll()
     local slotActive = false
     local slotActiveTicks = 0
@@ -182,9 +216,9 @@ local function inventoryPoll()
         end
     end
 end
-
+ 
 local SEARCH, CRAFT, INFO, REQUEST, SYSINFO
-
+ 
 local display = window.create(term.current(), 1, 1, term.getSize())
 term.redirect(display)
 local mode = ""
@@ -193,14 +227,14 @@ local modeLookup
 local w, h = display.getSize()
 local itemCountW = 5
 local itemNameW = w - itemCountW
-
+ 
 local function resetPalette(dev)
     dev = dev or display
     for i = 0, 15 do
         dev.setPaletteColor(2 ^ i, term.nativePaletteColor(2 ^ i))
     end
 end
-
+ 
 -- theme setup
 local function themeSetup(dev)
     dev = dev or display
@@ -279,42 +313,42 @@ local function themeSetup(dev)
         headerBg = colors.yellow
         selectBg = colors.black
         selectFg = colors.white
-
+ 
         dev.setPaletteColor(colors.gray, 0xCEB15F)   -- turtle slot color
         dev.setPaletteColor(colors.yellow, 0xdba519) -- turtle yellow
         dev.setPaletteColor(colors.white, 0xfcfcfc)  -- off white
         dev.setPaletteColor(colors.black, 0x1c0a11)  -- off black
     end
-
+ 
     -- selected item in lists
     selectBg = selectBg or mainFg
     selectFg = selectFg or mainBg
-
+ 
     -- top menu bar
     menuFg = menuFg or mainBg
     menuBg = menuBg or mainFg
-
+ 
     -- selected tab
     tabFg = tabFg or menuBg
     tabBg = tabBg or menuFg
-
+ 
     -- page headers
     headerFg = headerFg or mainFg
     headerBg = headerBg or mainBg
-
+ 
     -- search bars
     searchFg = searchFg or mainFg
     searchBg = searchBg or mainBg
-
+ 
     -- lists
     listFg = listFg or mainFg
     listBg = listBg or mainBg
-
+ 
     -- failure indicating color
     errFg = errFg or colors.red
 end
 themeSetup()
-
+ 
 local function formatItem(name, count)
     return ("%-" .. itemCountW .. "s %-" .. itemNameW .. "s"):format(count, name)
 end
@@ -333,7 +367,7 @@ local function text(x, y, t, device)
     device.setCursorPos(math.floor(x), math.floor(y))
     device.write(t)
 end
-
+ 
 ---@param t any[]
 ---@param pattern string
 ---@param sort nil|fun(a: any, b: any): boolean
@@ -357,22 +391,22 @@ local function filterList(t, pattern, sort, match)
     end
     return sifted
 end
-
+ 
 local craftInfo
-
+ 
 local function getFirstItemOnScreen(item, list)
     return math.max(math.min(math.max(1, item - 5), #list - h + 4), 1)
 end
-
+ 
 local function getLastItemOnScreen(item, list)
     local scroll = getFirstItemOnScreen(item, list)
     return math.min(scroll + h + 1, #list)
 end
-
+ 
 local function getYWithScroll(scroll, item)
     return 4 - scroll + item
 end
-
+ 
 ---@param filter string
 ---@param selected integer
 ---@param list any[] filtered list
@@ -406,7 +440,7 @@ local function drawSearch(filter, selected, list, header, dataFormatter)
     display.setCursorBlink(true)
     display.setCursorPos(filter:len() + 1, 2)
 end
-
+ 
 ---@param drawFunc function
 local function draw(drawFunc, ...)
     display.setVisible(false)
@@ -433,7 +467,7 @@ local function draw(drawFunc, ...)
     drawFunc(...)
     display.setVisible(true)
 end
-
+ 
 ---@return function? newMode
 local function handleClicks(x, y)
     local sx = 1
@@ -447,7 +481,7 @@ local function handleClicks(x, y)
         end
     end
 end
-
+ 
 local function doTransfers(item, target)
     local moved = true
     local firstTry = true
@@ -472,7 +506,7 @@ local function doTransfers(item, target)
     end
     return target
 end
-
+ 
 ---Request an item
 ---@param requestingCraft boolean
 ---@param item string
@@ -490,12 +524,12 @@ local function requestItem(requestingCraft, item, amount)
     doTransfers(item, amount)
     lib.performTransfer()
 end
-
+ 
 local function isEnter(key)
     return key == keys.enter or key == keys.numPadEnter
 end
-
-
+ 
+ 
 local function cycleTheme()
     local current = settings.get("misc.theme")
     local next
@@ -514,7 +548,7 @@ local function cycleTheme()
         themeSetup()
     end
 end
-
+ 
 local filter = ""
 ---Handle creating and drawing a searchable menu
 ---@param drawer fun(filter: string, selected: integer, sifted: any[])
@@ -582,86 +616,89 @@ local function searchableMenu(drawer, listProvider, onSelect, event, sort, match
         end
     end
 end
-
+ 
 local search_selected = 1
 function SEARCH()
     local list = lib.list()
     mode = "SEARCH"
-
+ 
     local drawer = function(filter, selected, sifted)
         drawSearch(filter, selected, sifted, formatItem("Name", "Count"), function(item)
             return formatItem(item.displayName, item.count)
         end)
     end
-
+ 
     local match = function(v, filter)
         return v.name:match(filter) or v.displayName:lower():match(filter) or v.displayName:match(filter)
     end
-
+ 
     local sort = function(a, b)
         if a.count ~= b.count then
             return a.count > b.count
         end
         return a.name < b.name
     end
-
+ 
     local onSelect = function(selected, index)
         search_selected = index
         return INFO(selected)
     end
-
+ 
     local event = function(e)
         if e[1] == "update" then
             list = e[2]
             return true
         end
     end
-
+ 
     return searchableMenu(drawer, function() return list end, onSelect, event, sort, match, CRAFT, search_selected)
 end
-
+ 
 function CRAFT()
     mode = "CRAFT"
     local craftables = lib.listCraftables()
-
+ 
     local drawer = function(craftFilter, selectedCraft, siftedCraftables)
         drawSearch(craftFilter, selectedCraft, siftedCraftables, "Name", function(item)
             return item
         end)
     end
-
+ 
     local onSelect = function(selected)
         return REQUEST(selected)
     end
-
+ 
     return searchableMenu(drawer, function() return craftables end, onSelect, nil, nil, nil, CONFIG)
 end
-
+--Evaluate expression in sandboxed enviroment
+--@param input number|string
+--@return number|nil
+local function safe_eval(input)
+    if not input then
+        return nil
+    end
+    local env = {}
+    for k, v in pairs(sandbox) do
+        env[k] = v
+    end
+    local func, err = load("return " .. input, "expression", "t", env)
+    if not func then
+        return nil, err
+    end
+ 
+ 
+    local success, result = pcall(func)
+    if not success then
+        return nil, result
+    end
+ 
+    return result
+end
 ---Read some number from the user
 ---@param input number|string
 ---@return number
-
-
-
-
+ 
 local function scroll_read(input)
-    correctChars = {
-        "*","/","+","-","(",")",
-    }
-
-    local function isCorrectChar(char)
-        if tonumber(char) then return true end
-        for i,correctChar in ipairs(correctChars) do
-            if char == correctChar then
-                return true
-            end
-        end
-        return false
-
-    end
-
-
-
     ---@type string
     input = tostring(input)
     local shiftHeld = false
@@ -673,14 +710,12 @@ local function scroll_read(input)
         term.write(input)
         local e, char = os.pullEvent()
         if e == "char" then
-            if isCorrectChar(char) then
-                input = input .. char
-            end
+            input = input .. char
         elseif e == "key" then
             if char == keys.backspace then
                 input = input:sub(1, -2)
             elseif char == keys.enter then
-                return tonumber(loadstring("return " .. input)()) or 0
+                return tonumber(input) or safe_eval(input) or 0
             elseif char == keys.leftShift then
                 shiftHeld = true
             end
@@ -693,18 +728,17 @@ local function scroll_read(input)
             input = tostring(newValue)
         elseif e == "mouse_click" then
             if char == 1 then
-                return tonumber(input) or 0
+                return tonumber(input) or safe_eval(input) or 0
             elseif char == 2 then
                 return 0
             end
         end
     end
 end
-
+ 
 function INFO(item)
     mode = "INFO"
-    --local itemAmount = math.min(item.maxCount, item.count)
-    local itemAmount = ""
+    local itemAmount = math.min(item.maxCount, item.count)
     draw(function()
         setColors(headerFg, headerBg)
         clearLine(2)
@@ -725,7 +759,7 @@ function INFO(item)
     requestItem(false, item, tonumber(itemAmount or 0))
     return SEARCH()
 end
-
+ 
 function REQUEST(item)
     mode = "REQUEST"
     if not item then
@@ -751,7 +785,7 @@ function REQUEST(item)
             break
         end
     end
-
+ 
     local oldTerm = term.current()
     local viewTerm = window.create(oldTerm, 1, 5, term.getSize())
     setColors(mainFg, mainBg, viewTerm)
@@ -801,7 +835,7 @@ function REQUEST(item)
     end)
     local scrollPos = 1
     win.reposition(1, scrollPos)
-
+ 
     while true do
         local e = { os.pullEvent() }
         if e[1] == "char" then
@@ -837,7 +871,7 @@ function REQUEST(item)
         end
     end
 end
-
+ 
 local function getConfigListString(item)
     local s = ""
     local i = item.parentStructure
@@ -865,7 +899,7 @@ local function getConfigListString(item)
     end
     return s
 end
-
+ 
 ---@param dev Window
 ---@param t table
 ---@param onChange fun(selected: tableStructure)
@@ -943,7 +977,7 @@ local function tableExplorer(dev, t, onChange)
         end
     }
 end
-
+ 
 local function handleEditEvents(ctrlHeld, e, tab, selected, parent)
     if e[1] == "key" then
         if e[2] == keys.leftCtrl then
@@ -1016,7 +1050,7 @@ local function handleEditEvents(ctrlHeld, e, tab, selected, parent)
     end
     return ctrlHeld
 end
-
+ 
 local function editTable(splitDesc, setting)
     local mid = 5 + #splitDesc
     local win = window.create(display, 1, mid, w, h - mid)
@@ -1086,7 +1120,7 @@ local function editTable(splitDesc, setting)
         end
     end
 end
-
+ 
 function EDIT(setting)
     mode = "EDIT"
     local splitDesc = require("cc.strings").wrap("Description: " .. setting.description, w)
@@ -1130,7 +1164,7 @@ function EDIT(setting)
         end
     end
 end
-
+ 
 function CONFIG()
     mode = "CONFIG"
     local configOptions = lib.getConfig()
@@ -1146,7 +1180,7 @@ function CONFIG()
             configList[#configList + 1] = s
         end
     end
-
+ 
     local fstring = "%-" .. longestLocation .. "s %-10s %-20s"
     local drawer = function(filter, selected, sifted)
         drawSearch(filter, selected, sifted, fstring:format("Location", "Value", "Description"),
@@ -1154,22 +1188,22 @@ function CONFIG()
                 return fstring:format(item.location, item.value, item.description)
             end)
     end
-
+ 
     local match = function(v, filter)
         return v.module:match(filter) or v.setting:match(filter) or v.location:match(filter)
     end
-
+ 
     local sort = function(a, b)
         return a.location < b.location
     end
-
+ 
     local onSelect = function(setting)
         return EDIT(setting)
     end
-
+ 
     return searchableMenu(drawer, function() return configList end, onSelect, nil, sort, match, SYSINFO)
 end
-
+ 
 function SYSINFO()
     mode = "SYSINFO"
     local timer = os.startTimer(1)
@@ -1198,16 +1232,17 @@ function SYSINFO()
         end
     end
 end
-
+ 
 modeLookup = { SEARCH = SEARCH, CRAFT = CRAFT, CONFIG = CONFIG, SYSINFO = SYSINFO }
-
+ 
 local funcs = { lib.subscribe, SEARCH }
-
+ 
 if turtleMode then
     funcs[#funcs + 1] = debounceTurtleInventory
     funcs[#funcs + 1] = processTurtleInventory
 else
     funcs[#funcs + 1] = inventoryPoll
 end
-
+ 
 parallel.waitForAny(table.unpack(funcs))
+ 
