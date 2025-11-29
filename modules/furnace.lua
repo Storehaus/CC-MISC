@@ -1,4 +1,5 @@
 --- Furnace crafting recipe handler
+-- 2 laptops from an AI cluster were sacrificed in fixing of this code
 ---@class modules.furnace
 return {
     id = "furnace",
@@ -128,23 +129,24 @@ return {
         ---@return boolean
         local function craftType(node, name, count, requestChain)
             local requires = recipes[name]
-            if not requires then
-                return false
-            end
-            local fuel, multiple, toCraft = getFuel(count) --[[@as integer]]
+            if not requires then return false end
+
+            local fuel, multiple = getFuel(count)
             node.type = "furnace"
-            node.count = toCraft
+            node.count = count
             node.done = 0
-            node.children = crafting.craft(requires, toCraft, node.jobId, nil, requestChain)
             node.ingredient = requires
-            node.fuel = fuel --[[@as string]]
+            node.fuel = fuel
             node.multiple = multiple
             node.smelting = {}
             node.fuelNeeded = {}
-            node.children = crafting.craft(fuel --[[@as string]], math.floor(toCraft / multiple), node.jobId, false,
-                requestChain)
+
+            node.children = crafting.craft(requires, count, node.jobId, nil, requestChain)
+            node.children = crafting.craft(fuel, math.ceil(count / multiple), node.jobId, false, requestChain)
+
             return true
         end
+
         crafting.addCraftType("furnace", craftType)
 
 
@@ -156,24 +158,20 @@ return {
             local usedFurances = {}
             local remaining = node.count
             if #attachedFurnaces > 0 then
-                while remaining > 0 do
-                    for furnace = 1, #attachedFurnaces do
-                        usedFurances[furnace] = true
-                        local toAssign = node.multiple
-                        local fuelNeeded = math.floor(toAssign / node.multiple)
-                        local absFurnace = require("abstractInvLib")({ attachedFurnaces[furnace] })
-                        local fmoved = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelNeeded, 2)
-                        local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign,
-                            1)
-                        node.smelting[attachedFurnaces[furnace]] = (node.smelting[furnace] or 0) + toAssign - moved
-                        node.fuelNeeded[attachedFurnaces[furnace]] = (node.fuelNeeded[furnace] or 0) + fuelNeeded -
-                            fmoved
-                        node.hasBucket = true
-                        remaining = remaining - toAssign
-                        if remaining == 0 then
-                            break
-                        end
-                    end
+                local furnaceIndex = 1
+                while remaining > 0 and furnaceIndex <= #attachedFurnaces do
+                    local furnace = attachedFurnaces[furnaceIndex]
+                    usedFurances[furnaceIndex] = true
+                    local toAssign = math.min(node.multiple, remaining)
+                    local fuelNeeded = math.ceil(toAssign / node.multiple)
+                    local absFurnace = require("abstractInvLib")({ furnace })
+                    local fmoved = loaded.inventory.interface.pushItems(false, absFurnace, node.fuel, fuelNeeded, 2)
+                    local moved = loaded.inventory.interface.pushItems(false, absFurnace, node.ingredient, toAssign, 1)
+                    node.smelting[furnace] = (node.smelting[furnace] or 0) + toAssign - moved
+                    node.fuelNeeded[furnace] = (node.fuelNeeded[furnace] or 0) + fuelNeeded - fmoved
+                    node.hasBucket = true
+                    remaining = remaining - toAssign
+                    furnaceIndex = furnaceIndex + 1
                 end
                 local ordered = {}
                 for k, v in pairs(usedFurances) do
@@ -222,7 +220,12 @@ return {
             end
             if node.done == node.count then
                 crafting.changeNodeState(node, "DONE")
+                for furnace in pairs(node.smelting) do
+                    table.insert(attachedFurnaces, furnace)
+                end
+                smelting[node] = nil
             end
+
         end
 
         local function furnaceChecker()

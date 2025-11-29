@@ -24,40 +24,6 @@ end
 
 local themes = { "default", "amber", "green", "aqua", "graphite", "hotdogstand", "turtle" }
 
-local sandbox = {}
-sandbox.math = {
-    abs = math.abs,
-    acos = math.acos,
-    asin = math.asin,
-    atan = math.atan,
-    ceil = math.ceil,
-    cos = math.cos,
-    deg = math.deg,
-    exp = math.exp,
-    floor = math.floor,
-    fmod = math.fmod,
-    huge = math.huge,
-    log = math.log,
-    max = math.max,
-    min = math.min,
-    mod = math.mod,
-    pi = math.pi,
-    pow = math.pow,
-    rad = math.rad,
-    random = math.random,
-    sin = math.sin,
-    sqrt = math.sqrt,
-    tan = math.tan,
-}
-local mt = {
-    __index = function(t, k)
-        error("Attempted to access undefined variable: " .. tostring(k))
-    end,
-    __newindex = function(t, k, v)
-        error("Cannot assign to global variables")
-    end
-}
-setmetatable(sandbox, mt)
 local function firstTimeSetup()
     settings.define("misc.turtle", { description = "Should this terminal be in turtle mode?", type = "boolean" })
     settings.define("misc.websocketURL",
@@ -670,35 +636,32 @@ function CRAFT()
 
     return searchableMenu(drawer, function() return craftables end, onSelect, nil, nil, nil, CONFIG)
 end
---Evaluate expression in sandboxed enviroment
---@param input number|string
---@return number|nil
-local function safe_eval(input)
-    if not input then
-        return nil
-    end
-    local env = {}
-    for k, v in pairs(sandbox) do
-        env[k] = v
-    end
-    local func, err = load("return " .. input, "expression", "t", env)
-    if not func then
-        return nil, err
-    end
 
-
-    local success, result = pcall(func)
-    if not success then
-        return nil, result
-    end
-
-    return result
-end
 ---Read some number from the user
 ---@param input number|string
 ---@return number
 
+
+
+
 local function scroll_read(input)
+    correctChars = {
+        "*","/","+","-","(",")",
+    }
+
+    local function isCorrectChar(char)
+        if tonumber(char) then return true end
+        for i,correctChar in ipairs(correctChars) do
+            if char == correctChar then
+                return true
+            end
+        end
+        return false
+
+    end
+
+
+
     ---@type string
     input = tostring(input)
     local shiftHeld = false
@@ -710,12 +673,14 @@ local function scroll_read(input)
         term.write(input)
         local e, char = os.pullEvent()
         if e == "char" then
-            input = input .. char
+            if isCorrectChar(char) then
+                input = input .. char
+            end
         elseif e == "key" then
             if char == keys.backspace then
                 input = input:sub(1, -2)
             elseif char == keys.enter then
-                return tonumber(input) or safe_eval(input) or 0
+                return tonumber(loadstring("return " .. input)()) or 0
             elseif char == keys.leftShift then
                 shiftHeld = true
             end
@@ -728,7 +693,7 @@ local function scroll_read(input)
             input = tostring(newValue)
         elseif e == "mouse_click" then
             if char == 1 then
-                return tonumber(input) or safe_eval(input) or 0
+                return tonumber(input) or 0
             elseif char == 2 then
                 return 0
             end
@@ -738,7 +703,8 @@ end
 
 function INFO(item)
     mode = "INFO"
-    local itemAmount = math.min(item.maxCount, item.count)
+    --local itemAmount = math.min(item.maxCount, item.count)
+    local itemAmount = ""
     draw(function()
         setColors(headerFg, headerBg)
         clearLine(2)
