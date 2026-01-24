@@ -205,6 +205,12 @@ return {
     local function deallocateItems(name, amount, taskId)
       common.enforceType(name, 1, "string")
       common.enforceType(amount, 2, "integer")
+
+      -- Ensure reservedItems[name] and reservedItems[name][taskId] exist
+      if not reservedItems[name] or not reservedItems[name][taskId] then
+        error("Attempt to deallocate items that are not reserved.")
+      end
+
       reservedItems[name][taskId] = reservedItems[name][taskId] - amount
       assert(reservedItems[name][taskId] >= 0, "We have negative items reserved?")
       if reservedItems[name][taskId] == 0 then
