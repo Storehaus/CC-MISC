@@ -16,7 +16,7 @@ if wirelessMode and not settings.get("misc.websocketURL") then
   settings.save()
 end
 
--- New Setting for Style with Prompt
+
 if not settings.get("misc.style") then
   settings.define("misc.style", { description = "Display style: horizontal, vertical, big, text, pie", type = "string" })
   print("Choose display style (horizontal, vertical, big, text, pie):")
@@ -26,7 +26,7 @@ if not settings.get("misc.style") then
   settings.save()
 end
 
--- New Setting for Text Scale with Prompt
+
 if not settings.get("misc.scale") then
   settings.define("misc.scale", { description = "Text scale (0.5 to 5)", type = "number" })
   print("Enter text scale (default 0.5):")
@@ -44,6 +44,16 @@ if not settings.get("misc.percentageCutoff") and settings.get("misc.style") == "
   local n = tonumber(s) / 100
   if not n then n = 0.1 end
   settings.set("misc.percentageCutoff", n)
+  settings.save()
+end
+
+
+if not settings.get("misc.theme") then
+  settings.define("misc.theme", { description = "Display theme: light, dark", type = "string" })
+  print("Choose display theme (light, dark):")
+  local t = read()
+  if t == "" then t = "light" end
+  settings.set("misc.theme", t)
   settings.save()
 end
 
@@ -67,13 +77,42 @@ else
 end
 
 -- Configuration Colors
-local labelFG = colors.black
-local labelBG = colors.white
-local usedBG = colors.red
-local freeBG = colors.gray
-local alertColor = colors.orange -- For big text mode
-local pieColors = {colors.blue, colors.green, colors.orange, colors.purple, colors.cyan, colors.yellow, colors.lime, colors.pink}
-local otherColor = colors.lightGray
+local currentTheme = settings.get("misc.theme") or "light"
+
+local function setThemeColors()
+  if currentTheme == "dark" then
+    -- Dark theme: pure black background, light text
+    return {
+      labelFG = colors.white,
+      labelBG = colors.black,
+      usedBG = colors.red,
+      freeBG = colors.gray,
+      alertColor = colors.orange,
+      pieColors = {colors.blue, colors.green, colors.orange, colors.purple, colors.cyan, colors.yellow, colors.lime, colors.pink},
+      otherColor = colors.lightGray
+    }
+  else
+    -- Light theme: pure white background, dark text
+    return {
+      labelFG = colors.black,
+      labelBG = colors.white,
+      usedBG = colors.red,
+      freeBG = colors.gray,
+      alertColor = colors.orange,
+      pieColors = {colors.blue, colors.green, colors.orange, colors.purple, colors.cyan, colors.yellow, colors.lime, colors.pink},
+      otherColor = colors.lightGray
+    }
+  end
+end
+
+local colorsConfig = setThemeColors()
+local labelFG = colorsConfig.labelFG
+local labelBG = colorsConfig.labelBG
+local usedBG = colorsConfig.usedBG
+local freeBG = colorsConfig.freeBG
+local alertColor = colorsConfig.alertColor
+local pieColors = colorsConfig.pieColors
+local otherColor = colorsConfig.otherColor
 
 -- Custom Font Definition
 local bigFont = {
@@ -296,18 +335,21 @@ styles.big = function(usage, w, h)
   if pct > 0.75 then bg = usedBG 
   elseif pct > 0.5 then bg = alertColor end
 
-  setColors(colors.white, bg)
+  -- Use theme-aware text color
+  local textColor = currentTheme == "dark" and colors.white or colors.black
+  setColors(textColor, bg)
   monitor.clear()
 
   local text = string.format("%d%%", math.floor(pct * 100))
   
   -- Center vertically (font is 5 high)
   local fontY = math.floor((h - 5) / 2) + 1
-  drawBigNumbers(text, fontY, colors.white, bg)
+  drawBigNumbers(text, fontY, textColor, bg)
   
   -- Subtext
   monitor.setTextScale(0.5)
   local w2, h2 = monitor.getSize()
+  setColors(textColor, bg)
   centerText(h2, string.format("%u / %u", usage.used, usage.total))
   monitor.setTextScale(textScale)
 end
@@ -484,6 +526,21 @@ local function writeUsage(providedItems)
   settings.load() 
   local currentStyle = settings.get("misc.style")
   local currentScale = settings.get("misc.scale")
+  local currentTheme = settings.get("misc.theme") or "light"
+
+  -- Update theme colors if theme changed
+  local newTheme = settings.get("misc.theme") or "light"
+  if newTheme ~= currentTheme then
+    currentTheme = newTheme
+    local colorsConfig = setThemeColors()
+    labelFG = colorsConfig.labelFG
+    labelBG = colorsConfig.labelBG
+    usedBG = colorsConfig.usedBG
+    freeBG = colorsConfig.freeBG
+    alertColor = colorsConfig.alertColor
+    pieColors = colorsConfig.pieColors
+    otherColor = colorsConfig.otherColor
+  end
 
   -- If in pie mode, we need item data.
   -- Use providedItems (from update event) or fetch fresh list if missing.
@@ -506,10 +563,13 @@ local function writeUsage(providedItems)
   -- Protected call to prevent crashing on drawing errors
   local ok, err = pcall(drawFunc, usage, w, h)
   if not ok then
-    monitor.setBackgroundColor(colors.black)
+    -- Use theme-aware colors for error display
+    local errorBG = currentTheme == "dark" and colors.black or colors.white
+    local errorFG = currentTheme == "dark" and colors.red or colors.red
+    monitor.setBackgroundColor(errorBG)
     monitor.clear()
     monitor.setCursorPos(1,1)
-    monitor.setTextColor(colors.red)
+    monitor.setTextColor(errorFG)
     print("Draw Error: " .. tostring(err))
     monitor.write("Style Error")
   end
