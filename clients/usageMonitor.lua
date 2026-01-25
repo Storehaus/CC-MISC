@@ -37,7 +37,7 @@ if not settings.get("misc.scale") then
   settings.save()
 end
 
-if not settings.get("misc.percentageCutoff") then
+if not settings.get("misc.percentageCutoff") and settings.get("misc.style") == "pie" then
   settings.define("misc.percentageCutoff", { description = "Percentage cutoff (1 to 100)", type = "number" })
   print("Enter percentage cutoff (default 5):")
   local s = read()
