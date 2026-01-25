@@ -37,6 +37,16 @@ if not settings.get("misc.scale") then
   settings.save()
 end
 
+if not settings.get("misc.percentageCutoff") then
+  settings.define("misc.percentageCutoff", { description = "Percentage cutoff (1 to 100)", type = "number" })
+  print("Enter percentage cutoff (default 5):")
+  local s = read()
+  local n = tonumber(s) / 100
+  if not n then n = 0.1 end
+  settings.set("misc.percentageCutoff", n)
+  settings.save()
+end
+
 settings.load()
 
 -- Peripheral Setup
@@ -371,7 +381,7 @@ styles.pie = function(usage, w, h)
 
   for _, item in ipairs(usage.items) do
     local pct = item.count / totalItems
-    if pct >= 0.10 then
+    if pct >= settings.get("misc.percentageCutoff") then
       table.insert(slices, {
         label = item.displayName or item.name or "Unknown",
         pct = pct,
