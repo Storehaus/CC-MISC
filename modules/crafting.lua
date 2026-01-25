@@ -208,7 +208,8 @@ return {
 
       -- Ensure reservedItems[name] and reservedItems[name][taskId] exist
       if not reservedItems[name] or not reservedItems[name][taskId] then
-        error("Attempt to deallocate items that are not reserved.")
+        print("Attempt to deallocate items that are not reserved.")
+        return
       end
 
       reservedItems[name][taskId] = reservedItems[name][taskId] - amount
