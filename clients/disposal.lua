@@ -210,6 +210,15 @@ local protocols = {
         task = message.task
         changeState(STATES.DISPOSING)
         tryToDispose()
+    end,
+    
+    DISCOVERY = function(message)
+        -- Respond to discovery requests from the server
+        modem.transmit(port, port, {
+            protocol = "DISCOVERY_RESPONSE",
+            destination = message.source,
+            source = networkName,
+        })
     end
 }
 

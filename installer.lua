@@ -1,7 +1,29 @@
+local args = { ... }
 local repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/master/"
 
-if ({ ... })[1] == "dev" then
-  repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
+-- Check if first argument is a GitHub repository path (format: username/repo)
+if args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
+    local repoPath = args[1]
+    print("Switching to repository: " .. repoPath)
+    print("Restarting installer with new repository...")
+    
+    -- Restart the installer with the new repository URL
+    local newUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
+    local response = http.get(newUrl .. "installer.lua", nil, true)
+    if response then
+        local f = fs.open("installer.lua", "wb")
+        f.write(response.readAll())
+        f.close()
+        response.close()
+        
+        -- Restart with the new installer
+        os.reboot()
+    else
+        print("Error: Could not fetch installer from " .. newUrl)
+        print("Falling back to default repository")
+    end
+elseif args[1] == "dev" then
+    repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
 end
 
 local function fromURL(url)
