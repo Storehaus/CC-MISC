@@ -5,25 +5,35 @@ local repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/maste
 if args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
     local repoPath = args[1]
     print("Switching to repository: " .. repoPath)
-    print("Restarting installer with new repository...")
+    print("Executing installer from target repository...")
     
-    -- Restart the installer with the new repository URL
+    -- Download and execute the installer from the target repository
     local newUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
     local response = http.get(newUrl .. "installer.lua", nil, true)
     if response then
-        local f = fs.open("installer.lua", "wb")
-        f.write(response.readAll())
-        f.close()
+        local installerCode = response.readAll()
         response.close()
         
-        -- Restart with the new installer
-        os.reboot()
+        -- Execute the installer from the target repository
+        -- Add a flag to indicate it's already on a separate repo
+        local newArgs = { repoPath, "from_separate_repo" }
+        local chunk = load(installerCode, "installer", "t", _ENV)
+        if chunk then
+            chunk(unpack(newArgs))
+        else
+            print("Error: Failed to load installer from target repository")
+            print("Falling back to default repository")
+        end
     else
         print("Error: Could not fetch installer from " .. newUrl)
         print("Falling back to default repository")
     end
 elseif args[1] == "dev" then
     repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
+elseif args[2] == "from_separate_repo" then
+    -- Already on a separate repo, construct URL from first argument
+    local repoPath = args[1]
+    repositoryUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
 end
 
 local function fromURL(url)
