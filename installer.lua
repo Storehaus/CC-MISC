@@ -15,8 +15,8 @@ if args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
         response.close()
         
         -- Execute the installer from the target repository
-        -- Add a flag to indicate it's already on a separate repo
-        local newArgs = { repoPath, "from_separate_repo" }
+        -- Add an internal flag to prevent infinite loops
+        local newArgs = { repoPath, "internal_separate_repo_flag" }
         local chunk = load(installerCode, "installer", "t", _ENV)
         if chunk then
             chunk(unpack(newArgs))
@@ -30,8 +30,8 @@ if args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
     end
 elseif args[1] == "dev" then
     repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
-elseif args[2] == "from_separate_repo" then
-    -- Already on a separate repo, construct URL from first argument
+elseif args[2] == "internal_separate_repo_flag" then
+    -- Internal flag detected - already on a separate repo, construct URL from first argument
     local repoPath = args[1]
     repositoryUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
 end
