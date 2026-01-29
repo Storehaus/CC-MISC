@@ -72,6 +72,15 @@ local logInstall = {
   }
 }
 
+local disposalInstall = {
+  name = "Disposal Module",
+  files = {
+    modules = {
+      ["disposal.lua"] = fromRepository "modules/disposal.lua"
+    }
+  }
+}
+
 local introspectionInstall = {
   name = "Introspection Module",
   files = {
@@ -127,6 +136,7 @@ local serverInstallOptions = {
   name = "Server installation options",
   b = baseInstall,
   c = craftInstall,
+  d = disposalInstall,
   i = introspectionInstall,
   l = logInstall,
   o = ioInstall,
@@ -181,14 +191,24 @@ local clientWatchdogInstall = {
   }
 }
 
+local clientDisposalInstall = {
+  name = "Disposal Module",
+  files = {
+    modules = {
+      ["startup.lua"] = fromRepository "clients/disposal.lua"
+    }
+  }
+}
+
 local clientInstallOptions = {
   name = "Client installation options",
   t = terminalInstall,
   i = introspectionTermInstall,
   c = crafterInstall,
+  d = clientDisposalInstall,
   m = monitorInstall,
   w = introspectionMonInstall,
-  d = clientWatchdogInstall
+  x = clientWatchdogInstall
 }
 
 local installOptions = {
