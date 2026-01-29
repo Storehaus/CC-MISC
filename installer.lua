@@ -32,8 +32,10 @@ elseif args[1] == "dev" then
     repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
 elseif args[2] == "internal_separate_repo_flag" then
     -- Internal flag detected - already on a separate repo, construct URL from first argument
+    -- DO NOT load/installer again, just set the URL and continue normally
     local repoPath = args[1]
     repositoryUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
+    print("Running installer from repository: " .. repoPath)
 end
 
 local function fromURL(url)
