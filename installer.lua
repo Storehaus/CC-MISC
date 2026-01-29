@@ -2,7 +2,13 @@ local args = { ... }
 local repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/master/"
 
 -- Check if first argument is a GitHub repository path (format: username/repo)
-if args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
+if args[2] == "internal_separate_repo_flag" then
+    -- Internal flag detected - already on a separate repo, construct URL from first argument
+    -- DO NOT load/installer again, just set the URL and continue normally
+    local repoPath = args[1]
+    repositoryUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
+    print("Running installer from repository: " .. repoPath)
+elseif args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
     local repoPath = args[1]
     print("Switching to repository: " .. repoPath)
     print("Executing installer from target repository...")
@@ -30,12 +36,6 @@ if args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
     end
 elseif args[1] == "dev" then
     repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
-elseif args[2] == "internal_separate_repo_flag" then
-    -- Internal flag detected - already on a separate repo, construct URL from first argument
-    -- DO NOT load/installer again, just set the URL and continue normally
-    local repoPath = args[1]
-    repositoryUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
-    print("Running installer from repository: " .. repoPath)
 end
 
 local function fromURL(url)
