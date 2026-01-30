@@ -7,9 +7,7 @@ return {
         disposalItems = {
             type = "table",
             description = "Patterns to match items for disposal and their thresholds table<pattern: string, threshold: integer>",
-            default = {
-                ["minecraft:dirt"] = 512  -- Default: dispose excess dirt above 512
-            }
+            default = {}
         },
         checkFrequency = {
             type = "number",
