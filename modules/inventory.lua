@@ -165,10 +165,17 @@ return {
           local retVal = table.pack(pcall(function() return storage[transfer[2]](table.unpack(transfer, 3, transfer.n)) end))
           if not retVal[1] then
             logger:error("Transfer %s %s failed with %s", transfer[1], transfer[2], retVal[2])
-            error(retVal[2])
+            -- Check if the error is due to a non-existent source, if so skip instead of crashing
+            if string.find(retVal[2], "does not exist") then
+              logger:warn("Skipping transfer %s %s - source does not exist", transfer[1], transfer[2])
+              os.queueEvent("inventoryFinished", transfer[1], 0) -- Return 0 to indicate no items transferred
+            else
+              error(retVal[2])
+            end
+          else
+            logger:debug("Transfer %s %s finished, returned %s", transfer[1], transfer[2], retVal[2])
+            os.queueEvent("inventoryFinished", transfer[1], table.unpack(retVal, 2))
           end
-          logger:debug("Transfer %s %s finished, returned %s", transfer[1], transfer[2], retVal[2])
-          os.queueEvent("inventoryFinished", transfer[1], table.unpack(retVal, 2))
         end
         if config.inventory.defragEachTransfer.value then
           defrag()

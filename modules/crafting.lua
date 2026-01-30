@@ -4,7 +4,7 @@ local common = require("common")
 return {
   id = "crafting",
   version = "1.4.1",
-  config = {
+    config = {
     tagLookup = {
       type = "table",
       description = "Force a given item to be used for a tag lookup. Map from tag->item.",
@@ -25,6 +25,16 @@ return {
       type = "number",
       description = "Interval between cleanup in seconds",
       default = 60,
+    },
+    autoCraftingRules = {
+      type = "table",
+      description = "Automatic crafting rules when item count is reached table<item: string, {threshold: integer, recipe: string}>",
+      default = {}
+    },
+    autoSmeltingRules = {
+      type = "table",
+      description = "Automatic smelting rules when item count is reached table<item: string, {threshold: integer, output: string}>",
+      default = {}
     }
   },
   dependencies = {
@@ -205,6 +215,19 @@ return {
     local function deallocateItems(name, amount, taskId)
       common.enforceType(name, 1, "string")
       common.enforceType(amount, 2, "integer")
+
+      -- Ensure reservedItems[name] and reservedItems[name][taskId] exist
+      if not reservedItems[name] or not reservedItems[name][taskId] then
+        -- Items were not reserved, this can happen when crafting completes successfully
+        -- and items were already consumed, or when tasks are cleaned up properly
+        if log then
+          craftLogger:debug("Attempt to deallocate items that are not reserved (name: %s, amount: %d, taskId: %s)", name, amount, taskId)
+        else
+          print("Attempt to deallocate items that are not reserved")
+        end
+        return 0
+      end
+
       reservedItems[name][taskId] = reservedItems[name][taskId] - amount
       assert(reservedItems[name][taskId] >= 0, "We have negative items reserved?")
       if reservedItems[name][taskId] == 0 then
@@ -937,7 +960,14 @@ return {
           craftLogger:debug("Nodes processed in crafting tick.")
           saveTaskLookup()
         end
-        os.sleep(config.crafting.tickInterval.value)
+        -- Use default value if config is not properly initialized
+        local sleepTime = 1
+        if config.crafting and config.crafting.tickInterval and type(config.crafting.tickInterval.value) == "number" then
+          sleepTime = config.crafting.tickInterval.value
+        else
+          craftLogger:warn("Using default sleep time for crafting tick (config.crafting.tickInterval.value not available)")
+        end
+        os.sleep(sleepTime)
       end
     end
 
@@ -1074,7 +1104,14 @@ return {
     end
     local function cleanupHandler()
       while true do
-        sleep(config.crafting.cleanupInterval.value)
+        -- Use default value if config is not properly initialized
+        local sleepTime = 60
+        if config.crafting and config.crafting.cleanupInterval and type(config.crafting.cleanupInterval.value) == "number" then
+          sleepTime = config.crafting.cleanupInterval.value
+        else
+          cleanupLogger:warn("Using default sleep time for cleanup handler (config.crafting.cleanupInterval.value not available)")
+        end
+        os.sleep(sleepTime)
         cleanupLogger:debug("Performing cleanup!")
         for k, v in pairs(pendingJobs) do
           if v.time + 200000 < os.epoch("utc") then
@@ -1097,6 +1134,105 @@ return {
             end
           end
         end
+      end
+    end
+
+    ---Auto-crafting/smelting functionality
+    local autoCraftLogger = setmetatable({}, {
+      __index = function()
+        return function()
+        end
+      end
+    })
+    if log then
+      autoCraftLogger = log.interface.logger("crafting", "auto_craft")
+    end
+
+    ---Check if an item should be auto-crafted based on current inventory count
+    ---@param name string
+    ---@return boolean shouldCraft
+    ---@return integer neededCount
+    local function shouldAutoCraftItem(name)
+      local rules = config.crafting and config.crafting.autoCraftingRules and config.crafting.autoCraftingRules.value or {}
+      local rule = rules[name]
+      if not rule or type(rule) ~= "table" or type(rule.threshold) ~= "number" then return false, 0 end
+
+      local currentCount = getCount(name)
+      if currentCount < rule.threshold then
+        return true, rule.threshold - currentCount
+      end
+      return false, 0
+    end
+
+    ---Check if an item should be auto-smelted based on current inventory count
+    ---@param name string
+    ---@return boolean shouldSmelt
+    ---@return integer neededCount
+    local function shouldAutoSmeltItem(name)
+      local rules = config.crafting and config.crafting.autoSmeltingRules and config.crafting.autoSmeltingRules.value or {}
+      local rule = rules[name]
+      if not rule or type(rule) ~= "table" or type(rule.threshold) ~= "number" or not rule.output then return false, 0 end
+
+      local currentCount = getCount(name)
+      if currentCount < rule.threshold then
+        return true, rule.threshold - currentCount
+      end
+      return false, 0
+    end
+
+    ---Check all items and trigger auto-crafting/smelting
+    local function checkAutoCrafting()
+      autoCraftLogger:debug("Checking for auto-crafting/smelting opportunities...")
+
+      -- Check auto-crafting rules with proper null checks
+      local autoCraftingRules = config.crafting and config.crafting.autoCraftingRules and config.crafting.autoCraftingRules.value or {}
+      for item, rule in pairs(autoCraftingRules) do
+        if type(rule) == "table" and type(rule.threshold) == "number" then
+          local shouldCraft, neededCount = shouldAutoCraftItem(item)
+          if shouldCraft then
+            autoCraftLogger:info("Auto-crafting %u %s(s) (threshold: %u)", neededCount, item, rule.threshold)
+            local jobInfo = requestCraft(item, neededCount)
+            if jobInfo.success then
+              startCraft(jobInfo.jobId)
+            end
+          end
+        else
+          autoCraftLogger:warn("Invalid auto-crafting rule for item %s", item)
+        end
+      end
+
+      -- Check auto-smelting rules with proper null checks
+      local autoSmeltingRules = config.crafting and config.crafting.autoSmeltingRules and config.crafting.autoSmeltingRules.value or {}
+      for item, rule in pairs(autoSmeltingRules) do
+        if type(rule) == "table" and type(rule.threshold) == "number" and rule.output then
+          local shouldSmelt, neededCount = shouldAutoSmeltItem(item)
+          if shouldSmelt then
+            autoCraftLogger:info("Auto-smelting to produce %u %s(s) (threshold: %u)", neededCount, rule.output, rule.threshold)
+            -- This would need integration with furnace module
+            -- For now, we'll just request crafting of the output item
+            local jobInfo = requestCraft(rule.output, neededCount)
+            if jobInfo.success then
+              startCraft(jobInfo.jobId)
+            end
+          end
+        else
+          autoCraftLogger:warn("Invalid auto-smelting rule for item %s", item)
+        end
+      end
+    end
+
+    ---Auto-crafting/smelting checker loop
+    local function autoCraftChecker()
+      while true do
+        -- Use default value if config is not properly initialized
+        local sleepTime = 10
+        if config.crafting and config.crafting.tickInterval and type(config.crafting.tickInterval.value) == "number" then
+          sleepTime = config.crafting.tickInterval.value * 10
+        else
+          autoCraftLogger:warn("Using default sleep time for auto-craft checker (config.crafting.tickInterval.value not available)")
+        end
+        sleep(sleepTime) -- Check every 10 crafting ticks (or default)
+        checkAutoCrafting()
       end
     end
 
@@ -1129,7 +1265,7 @@ return {
         loadReservedItems()
         loadCachedTags()
         loadPendingJobs()
-        parallel.waitForAny(tickCrafting, inventoryTransferListener, jsonFileImport, cleanupHandler)
+        parallel.waitForAny(tickCrafting, inventoryTransferListener, jsonFileImport, cleanupHandler, autoCraftChecker)
       end,
 
       requestCraft = requestCraft,

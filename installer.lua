@@ -1,7 +1,41 @@
+local args = { ... }
 local repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/master/"
 
-if ({ ... })[1] == "dev" then
-  repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
+-- Check if first argument is a GitHub repository path (format: username/repo)
+if args[2] == "internal_separate_repo_flag" then
+    -- Internal flag detected - already on a separate repo, construct URL from first argument
+    -- DO NOT load/installer again, just set the URL and continue normally
+    local repoPath = args[1]
+    repositoryUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
+    print("Running installer from repository: " .. repoPath)
+elseif args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
+    local repoPath = args[1]
+    print("Switching to repository: " .. repoPath)
+    print("Executing installer from target repository...")
+    
+    -- Download and execute the installer from the target repository
+    local newUrl = "https://raw.githubusercontent.com/" .. repoPath .. "/master/"
+    local response = http.get(newUrl .. "installer.lua", nil, true)
+    if response then
+        local installerCode = response.readAll()
+        response.close()
+        
+        -- Execute the installer from the target repository
+        -- Add an internal flag to prevent infinite loops
+        local newArgs = { repoPath, "internal_separate_repo_flag" }
+        local chunk = load(installerCode, "installer", "t", _ENV)
+        if chunk then
+            chunk(unpack(newArgs))
+        else
+            print("Error: Failed to load installer from target repository")
+            print("Falling back to default repository")
+        end
+    else
+        print("Error: Could not fetch installer from " .. newUrl)
+        print("Falling back to default repository")
+    end
+elseif args[1] == "dev" then
+    repositoryUrl = "https://raw.githubusercontent.com/Storehaus/CC-MISC/dev/"
 end
 
 local function fromURL(url)
@@ -38,6 +72,15 @@ local logInstall = {
   }
 }
 
+local disposalInstall = {
+  name = "Disposal Module",
+  files = {
+    modules = {
+      ["disposal.lua"] = fromRepository "modules/disposal.lua"
+    }
+  }
+}
+
 local introspectionInstall = {
   name = "Introspection Module",
   files = {
@@ -60,7 +103,7 @@ local baseInstall = {
   name = "Base MISC",
   files = {
     ["startup.lua"] = fromRepository "storage.lua",
-    ["abstractInvLib.lua"] = fromURL "https://gist.githubusercontent.com/ShreksHellraiser/57ef0f52a93304a17a9eaea21f431de6/raw/07c3322a5fa0d628e558e19017295728e4ee2e8d/abstractInvLib.lua", -- TODO change this
+    ["abstractInvLib.lua"] = fromRepository "lib/abstractInvLib.lua",
     ["common.lua"] = fromRepository "common.lua",
     modules = {
       ["inventory.lua"] = fromRepository "modules/inventory.lua",
@@ -93,6 +136,7 @@ local serverInstallOptions = {
   name = "Server installation options",
   b = baseInstall,
   c = craftInstall,
+  d = disposalInstall,
   i = introspectionInstall,
   l = logInstall,
   o = ioInstall,
@@ -147,14 +191,24 @@ local clientWatchdogInstall = {
   }
 }
 
+local clientDisposalInstall = {
+  name = "Disposal Module",
+  files = {
+    modules = {
+      ["startup.lua"] = fromRepository "clients/disposal.lua"
+    }
+  }
+}
+
 local clientInstallOptions = {
   name = "Client installation options",
   t = terminalInstall,
   i = introspectionTermInstall,
   c = crafterInstall,
+  d = clientDisposalInstall,
   m = monitorInstall,
   w = introspectionMonInstall,
-  d = clientWatchdogInstall
+  x = clientWatchdogInstall
 }
 
 local installOptions = {
