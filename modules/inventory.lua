@@ -233,8 +233,8 @@ return {
       performTransfer()
       
       -- WORKAROUND: Split exactly 64 into two moves to bypass the library bug
-      if amount == 64 then
-          local first = storage.pushItems(targetInventory, name, 63, toSlot, nbt, options)
+      if amount == 64 or amount == 16 then
+          local first = storage.pushItems(targetInventory, name, amount-1, toSlot, nbt, options)
           local second = storage.pushItems(targetInventory, name, 1, toSlot, nbt, options)
           return first + second
       end
