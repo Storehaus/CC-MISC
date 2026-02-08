@@ -3,8 +3,8 @@ local common = require("common")
 ---@field interface modules.crafting.interface
 return {
   id = "crafting",
-  version = "1.4.1",
-    config = {
+  version = "1.4.2", -- Bumped version
+  config = {
     tagLookup = {
       type = "table",
       description = "Force a given item to be used for a tag lookup. Map from tag->item.",
@@ -43,7 +43,9 @@ return {
   },
   init = function(loaded, config)
     local log = loaded.logger
-    ---@alias ItemInfo {[1]: string, tag: boolean?}
+    
+    -- FIX: Changed structure to pure object {name=..., tag=...} to avoid JSON crash
+    ---@alias ItemInfo {name: string, tag: boolean?}
 
     ---@alias ItemIndex integer
 
@@ -59,6 +61,7 @@ return {
       f.write(json.encode(itemLookup))
       f.close()
     end
+    
     local function loadItemLookup()
       local f = fs.open("recipes/item_lookup.json", "r")
       if f then
@@ -67,8 +70,13 @@ return {
         local decoded = json.decode(contents)
         if type(decoded) == "table" then
           itemLookup = decoded
+          -- Rebuild the reverse lookup map
           for k, v in pairs(itemLookup) do
-            itemNameLookup[v[1]] = k
+            -- Support both old format [1] and new format .name for backward compatibility during migration
+            local name = v.name or v[1]
+            if name then
+                itemNameLookup[name] = k
+            end
           end
         else
           print("Warning: Invalid item lookup JSON format")
@@ -87,7 +95,8 @@ return {
         return itemNameLookup[str]
       end
       local i = #itemLookup + 1
-      itemLookup[i] = { str, tag = not not tag }
+      -- FIX: Use named keys ONLY. Mixed keys [1] and ["tag"] crash json.lua
+      itemLookup[i] = { name = str, tag = not not tag }
       itemNameLookup[str] = i
       saveItemLookup() -- updated item lookup
       return i
@@ -363,10 +372,13 @@ return {
     local function selectBestFromIndex(index)
       common.enforceType(index, 1, "integer")
       local itemInfo = assert(itemLookup[index], "Invalid item index")
+      -- FIX: Access .name or [1] for backward compatibility
+      local name = itemInfo.name or itemInfo[1]
+      
       if itemInfo.tag then
-        return selectBestFromTag(itemInfo[1])
+        return selectBestFromTag(name)
       end
-      return true, itemInfo[1]
+      return true, name
     end
 
     ---Select the best item from a list of ItemIndex
@@ -375,7 +387,9 @@ return {
     ---@return string itemName
     local function selectBestFromList(list)
       common.enforceType(list, 1, "integer[]")
-      return true, itemLookup[list[1]][1]
+      -- FIX: Access .name or [1]
+      local itemInfo = itemLookup[list[1]]
+      return true, (itemInfo.name or itemInfo[1])
     end
 
     ---Select the best item
@@ -399,7 +413,8 @@ return {
     local function getString(v)
       local itemInfo = itemLookup[v]
       assert(itemInfo, "Invalid key passed to getString")
-      return itemInfo[1], itemInfo.tag
+      -- FIX: Access .name or [1]
+      return (itemInfo.name or itemInfo[1]), itemInfo.tag
     end
 
     ---Merge from into the end of to
