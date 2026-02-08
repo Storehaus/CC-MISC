@@ -3,7 +3,7 @@ local common = require("common")
 ---@field interface modules.crafting.interface
 return {
   id = "crafting",
-  version = "1.4.4", -- Bumped version
+  version = "1.4.5", -- Bumped version
   config = {
     tagLookup = {
       type = "table",
@@ -241,7 +241,7 @@ return {
       end
     end
 
-    -- NEW: Load aliases/tags from recipes.json
+    -- Load aliases/tags from recipes.json
     local function loadAliases()
       if not fs.exists("recipes/recipes.json") then return end
       local f = fs.open("recipes/recipes.json", "r")
@@ -253,11 +253,6 @@ return {
             print("Loading aliases from recipes.json...")
             local count = 0
             for tag, items in pairs(data.aliases) do
-                -- Clean key if it starts with # for consistency with internal lookups
-                -- However, our Python script saves them with #, and selectBestFromTag expects the tag string as passed
-                -- Usually passed tags in recipes might or might not have #. 
-                -- We assume the system uses the string exactly as it appears in the recipe file.
-                
                 cachedTagLookup[tag] = items
                 cachedTagPresence[tag] = cachedTagPresence[tag] or {}
                 for _, item in ipairs(items) do
@@ -281,35 +276,46 @@ return {
       if not cachedTagPresence[tag] then
         cachedTagPresence[tag] = {}
         cachedTagLookup[tag] = {}
-        -- If it's missing, we might save, but we should rely on loadAliases primarily for static tags
         saveCachedTags()
       end
       
-      -- 1. Check if we have physical items matching the tag in inventory
-      -- Note: This relies on the inventory peripheral being able to identify tags on items
-      local itemsWithTag = loaded.inventory.interface.getTag(tag)
+      -- 1. Gather all candidates (from Inventory Peripheral AND Aliases)
+      -- Use a dictionary to avoid duplicates
+      local candidates = {} 
       
-      -- 2. If inventory doesn't support tags (returns empty), fallback to our Alias table
-      if #itemsWithTag == 0 and cachedTagLookup[tag] then
-         -- We have a definition for this tag (e.g. #minecraft:logs -> [oak_log, ...])
-         -- We should check if we have any of THOSE items
-         for _, aliasItem in ipairs(cachedTagLookup[tag]) do
-            if loaded.inventory.interface.getCount(aliasItem) > 0 then
-               table.insert(itemsWithTag, aliasItem)
-            end
-         end
+      -- Check inventory peripheral
+      local inventoryTags = loaded.inventory.interface.getTag(tag)
+      if inventoryTags then
+          for _, item in ipairs(inventoryTags) do
+              candidates[item] = true
+          end
+      end
+      
+      -- Check cached aliases (from recipes.json)
+      if cachedTagLookup[tag] then
+          for _, item in ipairs(cachedTagLookup[tag]) do
+              candidates[item] = true
+          end
       end
 
-      -- Sort by count to use most abundant item
+      -- 2. Check counts for ALL candidates
       local itemsWithTagsCount = {}
-      for k, v in ipairs(itemsWithTag) do
-        if not cachedTagPresence[tag][v] then
-          cachedTagPresence[tag][v] = true
-          table.insert(cachedTagLookup[tag], v)
-          saveCachedTags()
-        end
-        itemsWithTagsCount[k] = { name = v, count = loaded.inventory.interface.getCount(v) }
+      for name, _ in pairs(candidates) do
+          -- Cache this item as belonging to this tag for future use
+          if not cachedTagPresence[tag][name] then
+              cachedTagPresence[tag][name] = true
+              table.insert(cachedTagLookup[tag], name)
+              saveCachedTags()
+          end
+          
+          -- Check if we actually have it
+          local count = loaded.inventory.interface.getCount(name)
+          if count > 0 then
+              table.insert(itemsWithTagsCount, { name = name, count = count })
+          end
       end
+      
+      -- Sort by count to use most abundant item
       table.sort(itemsWithTagsCount, function(a, b) return a.count > b.count end)
       
       if itemsWithTagsCount[1] then
@@ -323,6 +329,15 @@ return {
         isCraftableLUT[v] = true
       end
 
+      -- Check all known aliases for craftability
+      for name, _ in pairs(candidates) do
+        if isCraftableLUT[name] then
+          return true, name
+        end
+      end
+      
+      -- If we have aliases that we haven't checked (maybe because they weren't in candidates list above?)
+      -- Fallback to strict cached lookup check
       for k, v in pairs(cachedTagLookup[tag]) do
         if isCraftableLUT[v] then
           return true, v 
