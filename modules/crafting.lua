@@ -489,9 +489,9 @@ return {
         taskLookup = {}
       end
       jobLookup = {}
-      waitingQueue = []
-      readyQueue = []
-      craftingQueue = []
+      waitingQueue = {}
+      readyQueue = {}
+      craftingQueue = {}
       doneLookup = {}
       for k, v in pairs(taskLookup) do
         taskLoaderLogger:debug("Loaded taskId=%s,state=%s", v.taskId, v.state)
