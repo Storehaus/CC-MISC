@@ -3,7 +3,7 @@ local common = require("common")
 ---@field interface modules.crafting.interface
 return {
   id = "crafting",
-  version = "1.4.6", -- Bumped version for fix
+  version = "1.4.7", -- Bumped version for fix
   config = {
     tagLookup = {
       type = "table",
@@ -266,82 +266,108 @@ return {
       end
     end
 
+    local craft -- forward declaration
+    local function runOnAll(root, func)
+      common.enforceType(root, 1, "table")
+      common.enforceType(func, 2, "function")
+      func(root)
+      if root.children then
+        for _, v in pairs(root.children) do runOnAll(v, func) end
+      end
+    end
+
+    local function getJobInfo(root)
+      common.enforceType(root, 1, "table")
+      local ret = { success = true, toCraft = {}, toUse = {}, missing = {}, jobId = root.jobId }
+      runOnAll(root, function(node)
+        if node.type == "ITEM" then ret.toUse[node.name] = (ret.toUse[node.name] or 0) + node.count
+        elseif node.type == "MISSING" then
+          ret.success = false
+          ret.missing[node.name] = (ret.missing[node.name] or 0) + node.count
+        elseif node.type ~= "ROOT" then
+          ret.toCraft[node.name] = (ret.toCraft[node.name] or 0) + (node.count or 0)
+        end
+      end)
+      return ret
+    end
+
     local function selectBestFromTag(tag)
       common.enforceType(tag, 1, "string")
       if config.crafting.tagLookup.value[tag] then
         return true, config.crafting.tagLookup.value[tag]
       end
       
-      -- Ensure cache initialized
       if not cachedTagPresence[tag] then
         cachedTagPresence[tag] = {}
         cachedTagLookup[tag] = {}
         saveCachedTags()
       end
       
-      -- 1. Gather all candidates (from Inventory Peripheral AND Aliases)
-      -- Use a dictionary to avoid duplicates
       local candidates = {} 
-      
-      -- Check inventory peripheral
       local inventoryTags = loaded.inventory.interface.getTag(tag)
       if inventoryTags then
-          for _, item in ipairs(inventoryTags) do
-              candidates[item] = true
-          end
+          for _, item in ipairs(inventoryTags) do candidates[item] = true end
       end
-      
-      -- Check cached aliases (from recipes.json)
       if cachedTagLookup[tag] then
-          for _, item in ipairs(cachedTagLookup[tag]) do
-              candidates[item] = true
-          end
+          for _, item in ipairs(cachedTagLookup[tag]) do candidates[item] = true end
       end
 
-      -- 2. Check counts for ALL candidates
       local itemsWithTagsCount = {}
       for name, _ in pairs(candidates) do
-         -- Cache this item as belonging to this tag for future use
          if not cachedTagPresence[tag][name] then
              cachedTagPresence[tag][name] = true
              table.insert(cachedTagLookup[tag], name)
              saveCachedTags()
          end
-         
-         -- Check if we actually have it
          local count = loaded.inventory.interface.getCount(name)
          if count > 0 then
              table.insert(itemsWithTagsCount, { name = name, count = count })
          end
       end
       
-      -- Sort by count to use most abundant item
       table.sort(itemsWithTagsCount, function(a, b) return a.count > b.count end)
       
       if itemsWithTagsCount[1] then
         return true, itemsWithTagsCount[1].name
       end
 
-      -- 3. Check if we can craft any item belonging to this tag
       local craftableList = listCraftables()
       local isCraftableLUT = {}
       for k, v in pairs(craftableList) do
         isCraftableLUT[v] = true
       end
 
-      -- Check all known aliases for craftability
+      -- Filter candidates to only those that are theoretically craftable
+      local craftableCandidates = {}
       for name, _ in pairs(candidates) do
         if isCraftableLUT[name] then
-          return true, name
+          table.insert(craftableCandidates, name)
         end
       end
       
-      -- If we have aliases that we haven't checked (maybe because they weren't in candidates list above?)
-      -- Fallback to strict cached lookup check
+      -- Fallback: If we have tags in cache but they weren't in candidates list
       for k, v in pairs(cachedTagLookup[tag]) do
-        if isCraftableLUT[v] then
-          return true, v 
+        if isCraftableLUT[v] and not candidates[v] then
+          table.insert(craftableCandidates, v)
         end
+      end
+
+      -- Simulation check: Pick the candidate we can actually craft
+      for _, name in ipairs(craftableCandidates) do
+          -- Simulate crafting 1 item
+          local simChain = { isSimulation = true }
+          local simNodes = craft(name, 1, "sim", nil, simChain)
+          -- Check success
+          local root = { jobId = "sim", children = simNodes, type = "ROOT", taskId = "sim" }
+          local info = getJobInfo(root)
+          if info.success then
+              return true, name
+          end
+      end
+
+      -- If all fail, fallback to the first one (will likely fail later but better than nothing)
+      if craftableCandidates[1] then
+          return true, craftableCandidates[1]
       end
 
       return false, tag
@@ -352,7 +378,6 @@ return {
       local itemInfo = assert(itemLookup[index], "Invalid item index")
       local name = itemInfo.name or itemInfo[1]
       if itemInfo.tag then
-        -- Add # if missing for tag lookup, as aliases usually have it
         local lookupName = name
         if not lookupName:find("^#") then lookupName = "#" .. lookupName end
         return selectBestFromTag(lookupName)
@@ -360,11 +385,9 @@ return {
       return true, name
     end
 
-    -- FIX: Select the best item from a list of options (instead of blindly picking the first)
     local function selectBestFromList(list)
       common.enforceType(list, 1, "integer[]")
       
-      -- Try to find one we already have
       for _, itemIndex in ipairs(list) do
           local itemInfo = itemLookup[itemIndex]
           local name = itemInfo.name or itemInfo[1]
@@ -373,21 +396,31 @@ return {
           end
       end
 
-      -- Try to find one we can craft
       local craftableList = listCraftables()
       local isCraftableLUT = {}
       for k, v in pairs(craftableList) do
         isCraftableLUT[v] = true
       end
+      
+      local craftableCandidates = {}
       for _, itemIndex in ipairs(list) do
           local itemInfo = itemLookup[itemIndex]
           local name = itemInfo.name or itemInfo[1]
           if isCraftableLUT[name] then
+              table.insert(craftableCandidates, name)
+          end
+      end
+
+      for _, name in ipairs(craftableCandidates) do
+          local simChain = { isSimulation = true }
+          local simNodes = craft(name, 1, "sim", nil, simChain)
+          local root = { jobId = "sim", children = simNodes, type = "ROOT", taskId = "sim" }
+          local info = getJobInfo(root)
+          if info.success then
               return true, name
           end
       end
       
-      -- Default to the first one if we can't find anything better
       local firstInfo = itemLookup[list[1]]
       return true, (firstInfo.name or firstInfo[1])
     end
@@ -489,7 +522,7 @@ return {
 
     local craftLogger = setmetatable({}, { __index = function() return function() end end })
     if log then craftLogger = log.interface.logger("crafting", "request_craft") end
-    local craft
+    
     local requestCraftTypes = {}
     local function addCraftType(type, func)
       common.enforceType(type, 1, "string")
@@ -533,8 +566,13 @@ return {
       common.enforceType(force, 4, "boolean", "nil")
       common.enforceType(requestChain, 5, "table", "nil")
       requestChain = shallowClone(requestChain or {})
+      
+      -- Stop loop
       if requestChain[name] then return { createMissingNode(name, count, jobId) } end
       requestChain[name] = true
+      
+      local isSimulation = requestChain.isSimulation
+      
       local nodes = {}
       local remaining = count
       craftLogger:debug("Remaining craft count for %s is %u", name, remaining)
@@ -542,7 +580,13 @@ return {
         local node = { name = name, taskId = id(), jobId = jobId, priority = 1 }
         local available = getCount(name)
         if available > 0 and not force then
-          local allocateAmount = allocateItems(name, math.min(available, remaining), node.taskId)
+          local allocateAmount
+          if isSimulation then
+             -- Mock allocation
+             allocateAmount = math.min(available, remaining)
+          else
+             allocateAmount = allocateItems(name, math.min(available, remaining), node.taskId)
+          end
           node.type = "ITEM"
           node.count = allocateAmount
           remaining = remaining - allocateAmount
@@ -817,21 +861,6 @@ return {
       pendingJobs[jobId] = root
       savePendingJobs()
       return jobId
-    end
-
-    local function getJobInfo(root)
-      common.enforceType(root, 1, "table")
-      local ret = { success = true, toCraft = {}, toUse = {}, missing = {}, jobId = root.jobId }
-      runOnAll(root, function(node)
-        if node.type == "ITEM" then ret.toUse[node.name] = (ret.toUse[node.name] or 0) + node.count
-        elseif node.type == "MISSING" then
-          ret.success = false
-          ret.missing[node.name] = (ret.missing[node.name] or 0) + node.count
-        elseif node.type ~= "ROOT" then
-          ret.toCraft[node.name] = (ret.toCraft[node.name] or 0) + (node.count or 0)
-        end
-      end)
-      return ret
     end
 
     local function requestCraft(name, count)
