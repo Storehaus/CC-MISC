@@ -1,10 +1,11 @@
 --- Grid crafting recipe handler
 local common = require("common")
 local json = require("lib/json")
+
 ---@class modules.grid
 return {
   id = "grid",
-  version = "1.1.7",
+  version = "1.4.3",
   config = {
     port = {
       type = "number",
@@ -19,7 +20,7 @@ return {
   },
   dependencies = {
     logger = { min = "1.1", optional = true },
-    crafting = { min = "1.1" },
+    crafting = { min = "1.4" },
     interface = { min = "1.4" }
   },
   ---@param loaded {crafting: modules.crafting, logger: modules.logger|nil}
@@ -38,12 +39,6 @@ return {
     ---@type table<string,GridRecipe>
     local gridRecipes = {}
 
-    ---This node represents a grid crafting recipe
-    ---@class GridNode : CraftingNode
-    ---@field type "CG"
-    ---@field toCraft integer
-    ---@field plan table<integer,{max:integer,name:string,count:integer}>
-
     local crafting = loaded.crafting.interface.recipeInterface
 
     ---Cache information about a GridRecipe that can be inferred from stored data
@@ -52,13 +47,11 @@ return {
       recipe.requires = {}
       for k, v in ipairs(recipe.recipe) do
         -- v can be an integer (ItemIndex) or a table (array of ItemIndex options)
-        -- We need to handle both cases
-        if type(v) == "table" then
-          -- This is an array of options, we don't cache requirements for these
-        else
-          -- This is a single ItemIndex
-          local old = recipe.requires[v]
-          recipe.requires[v] = (old or 0) + 1
+        -- We only cache single items. 0 is Air.
+        if type(v) == "number" and v ~= 0 then
+          -- FIX: Convert integer ID to string. JSON object keys MUST be strings.
+          local key = tostring(v)
+          recipe.requires[key] = (recipe.requires[key] or 0) + 1
         end
       end
     end
@@ -74,7 +67,7 @@ return {
     ---Add a grid recipe manually
     ---@param name string
     ---@param produces integer
-    ---@param recipe string[] table of ITEM NAMES, this does NOT support tags. Shaped recipes are assumed 3x3. Nil is assumed empty space.
+    ---@param recipe string[] table of ITEM NAMES.
     ---@param shaped boolean
     local function addGridRecipe(name, produces, recipe, shaped)
       common.enforceType(name, 1, "string")
@@ -105,8 +98,6 @@ return {
     end
 
     ---Remove a grid recipe
-    ---@param name string
-    ---@return boolean success
     local function removeGridRecipe(name)
       common.enforceType(name, 1, "string")
       if gridRecipes[name] then
@@ -119,28 +110,51 @@ return {
 
     ---Load the grid recipes from a file
     local function loadGridRecipes()
+      if not fs.exists("recipes/recipes.json") then return end
+
       local f = fs.open("recipes/recipes.json", "r")
       if f then
         local contents = f.readAll() or "{}"
         f.close()
-        local decoded = json.decode(contents)
+        
+        local status, decoded = pcall(json.decode, contents)
+        if not status then
+            print("Error decoding recipes.json: " .. tostring(decoded))
+            return 
+        end
 
         if type(decoded) == "table" and decoded.recipes and decoded.recipes.crafting then
           
-          -- Helper to process a single item string (handles tags starting with #)
-          local function processItemString(str)
+          -- Helper: Parses "minecraft:stone" or "#minecraft:logs" into the internal ID
+          local function parseItemString(str)
             local name = str
             local isTag = false
-            if name:sub(1, 1) == "#" then
+            -- Check if it starts with # (Tag)
+            if type(name) == "string" and name:sub(1, 1) == "#" then
               name = name:sub(2)
               isTag = true
             end
+            -- Delegate to crafting module so IDs are consistent and aliases work
             return crafting.getOrCacheString(name, isTag)
           end
 
+          -- Helper: Handles string vs table (array of options)
+          local function parseIngredient(raw)
+            if type(raw) == "table" then
+              local options = {}
+              for _, v in pairs(raw) do
+                table.insert(options, parseItemString(v))
+              end
+              return options
+            else
+              return parseItemString(raw)
+            end
+          end
+
           for _, recipe in ipairs(decoded.recipes.crafting) do
-            if recipe.type == "minecraft:crafting_shaped" or recipe.type == "minecraft:crafting_shapeless" then
-              -- Handle result being an object {item="...", count=1}
+            if (recipe.type == "minecraft:crafting_shaped" or recipe.type == "minecraft:crafting_shapeless") 
+               and recipe.result and recipe.result.item then
+              
               local recipeName = recipe.result.item
               local count = recipe.result.count or 1
               
@@ -150,53 +164,45 @@ return {
               gridRecipe.name = recipeName
               gridRecipe.recipe = {}
 
+              local valid = true
+
               if gridRecipe.shaped then
-                gridRecipe.width = recipe.pattern[1]:len()
-                gridRecipe.height = #recipe.pattern
-                
-                -- Parse the Key (Map characters to item IDs)
-                local keys = { [" "] = 0 }
-                for char, data in pairs(recipe.key) do
-                  if type(data) == "table" then
-                    -- It's a list of options (e.g., wood planks)
-                    local options = {}
-                    for _, optionItem in ipairs(data) do
-                      table.insert(options, processItemString(optionItem))
+                if not recipe.pattern or type(recipe.key) ~= "table" then
+                    valid = false
+                else
+                    gridRecipe.width = recipe.pattern[1]:len()
+                    gridRecipe.height = #recipe.pattern
+                    
+                    local keys = { [" "] = 0 }
+                    for char, value in pairs(recipe.key) do
+                      keys[char] = parseIngredient(value)
                     end
-                    keys[char] = options
-                  else
-                    -- It's a single string (e.g., "minecraft:stick")
-                    keys[char] = processItemString(data)
-                  end
-                end
 
-                -- Build the recipe grid
-                for row, rowString in ipairs(recipe.pattern) do
-                  for i = 1, rowString:len() do
-                    local char = rowString:sub(i, i)
-                    table.insert(gridRecipe.recipe, keys[char] or 0)
-                  end
-                end
-
-              else -- Shapeless
-                gridRecipe.length = #recipe.ingredients
-                for _, ingredient in ipairs(recipe.ingredients) do
-                  if type(ingredient) == "table" then
-                    -- List of alternatives
-                    local options = {}
-                    for _, optionItem in ipairs(ingredient) do
-                      table.insert(options, processItemString(optionItem))
+                    for row, rowString in ipairs(recipe.pattern) do
+                      for i = 1, rowString:len() do
+                        local char = rowString:sub(i, i)
+                        table.insert(gridRecipe.recipe, keys[char] or 0)
+                      end
                     end
-                    table.insert(gridRecipe.recipe, options)
-                  else
-                    -- Single item
-                    table.insert(gridRecipe.recipe, processItemString(ingredient))
-                  end
+                end
+              else 
+                -- Handle Shapeless
+                if not recipe.ingredients then
+                    valid = false
+                else
+                    gridRecipe.length = #recipe.ingredients
+                    for _, ingredient in ipairs(recipe.ingredients) do
+                      table.insert(gridRecipe.recipe, parseIngredient(ingredient))
+                    end
                 end
               end
 
-              cacheAdditional(gridRecipe)
-              gridRecipes[recipeName] = gridRecipe
+              if valid then
+                  cacheAdditional(gridRecipe)
+                  gridRecipes[recipeName] = gridRecipe
+              else
+                  print("Skipped invalid recipe: " .. tostring(recipeName))
+              end
             end
           end
         end
@@ -209,7 +215,6 @@ return {
     ---@field name string
     ---@field task nil|GridNode
     ---@field state "READY" | "ERROR" | "BUSY" | "CRAFTING" | "DONE"
-
 
     local attachedTurtles = {}
     local modem = assert(peripheral.wrap(config.modem.modem.value), "Bad modem specified.")
@@ -332,7 +337,6 @@ return {
       end
     end
 
-    ---comment
     ---@param node GridRecipe
     ---@param name string
     ---@param count integer
@@ -345,19 +349,17 @@ return {
         return false
       end
       node.type = "grid"
-      -- find out how many times we need to craft this recipe
       local toCraft = math.ceil(count / recipe.produces)
-      -- this is the minimum amount we'd need to craft to produce enough of the requested item
-      -- now we need to find the smallest stack-size of the ingredients
+      
       ---@type table<integer,{name: string, max: integer, count: integer}>
       local plan = {}
       for k, v in pairs(recipe.recipe) do
         if v ~= 0 then
+          -- This calls crafting.getBestItem, which uses the alias logic in crafting.lua
           local success, itemName = crafting.getBestItem(v)
           plan[k] = {}
           if success then
             plan[k].name = itemName
-            -- We can only craft as many items as the smallest stack size allows us to
             plan[k].max = crafting.getStackSize(plan[k].name)
             toCraft = math.min(toCraft, plan[k].max)
           else
@@ -375,7 +377,6 @@ return {
       for k, v in pairs(plan) do
         v.count = toCraft
         if v.tag then
-          -- this is a tag we could not resolve, so make a placeholder node
           table.insert(node.children, crafting.createMissingNode(v.tag, v.count, node.jobId))
         else
           requiredItemCounts[v.name] = (requiredItemCounts[v.name] or 0) + v.count
@@ -393,7 +394,6 @@ return {
     crafting.addCraftType("grid", craftType)
 
     local function readyHandler(node)
-      -- check if there is a turtle available to craft this recipe
       local availableTurtle
       for k, v in pairs(attachedTurtles) do
         if v.state == "READY" then
@@ -425,71 +425,10 @@ return {
     end
     crafting.addReadyHandler("grid", readyHandler)
 
-    local function jsonTypeHandler(json)
-      local recipe = {}
-      local recipeName
-      recipe.shaped = json.type == "minecraft:crafting_shaped"
-      recipeName = json.result.item
-      recipe.produces = json.result.count or 1
-      if json.type == "minecraft:crafting_shapeless" then
-        recipe.recipe = {}
-        recipe.length = #json.ingredients
-        for k, v in pairs(json.ingredients) do
-          local name = v.item or v.tag
-          local isTag = not not v.tag
-          if not (name) then
-            local array = {}
-            for _, opt in pairs(v) do
-              name = opt.item or opt.tag
-              table.insert(array, crafting.getOrCacheString(name, isTag))
-            end
-            table.insert(recipe.recipe, array)
-          else
-            table.insert(recipe.recipe, crafting.getOrCacheString(name, isTag))
-          end
-        end
-      elseif json.type == "minecraft:crafting_shaped" then
-        ---@type table<string,integer|integer[]>
-        local keys = { [" "] = 0 }
-        for k, v in pairs(json.key) do
-          local name = v.item or v.tag
-          local isTag = not not v.tag
-          if not (name) then
-            local array = {}
-            for _, opt in pairs(v) do
-              name = opt.item or opt.tag
-              table.insert(array, crafting.getOrCacheString(name, isTag))
-            end
-            keys[k] = array
-          else
-            keys[k] = crafting.getOrCacheString(name, isTag)
-          end
-        end
-        recipe.recipe = {}
-        recipe.width = json.pattern[1]:len()
-        recipe.height = #json.pattern
-        for row, rowString in ipairs(json.pattern) do
-          for i = 1, rowString:len() do
-            table.insert(recipe.recipe, keys[rowString:sub(i, i)])
-          end
-        end
-      end
-      cacheAdditional(recipe)
-      recipe.name = recipeName
-      gridRecipes[recipeName] = recipe
-    end
-    crafting.addJsonTypeHandler("minecraft:crafting_shaped", jsonTypeHandler)
-    crafting.addJsonTypeHandler("minecraft:crafting_shapeless", jsonTypeHandler)
-
     local function craftingHandler(node)
-      -- -- Check if the turtle's state is DONE
-      -- local turtle = attached_turtles[node.turtle]
-      -- if turtle.state == "DONE" then
-      --   turtle_crafting_done(turtle)
-      -- end
     end
     crafting.addCraftingHandler("grid", craftingHandler)
-    ---@class modules.grid.interface
+    
     return {
       start = function()
         loadGridRecipes()

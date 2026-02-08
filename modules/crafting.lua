@@ -3,7 +3,7 @@ local common = require("common")
 ---@field interface modules.crafting.interface
 return {
   id = "crafting",
-  version = "1.4.5", -- Bumped version
+  version = "1.4.6", -- Bumped version for fix
   config = {
     tagLookup = {
       type = "table",
@@ -301,18 +301,18 @@ return {
       -- 2. Check counts for ALL candidates
       local itemsWithTagsCount = {}
       for name, _ in pairs(candidates) do
-          -- Cache this item as belonging to this tag for future use
-          if not cachedTagPresence[tag][name] then
-              cachedTagPresence[tag][name] = true
-              table.insert(cachedTagLookup[tag], name)
-              saveCachedTags()
-          end
-          
-          -- Check if we actually have it
-          local count = loaded.inventory.interface.getCount(name)
-          if count > 0 then
-              table.insert(itemsWithTagsCount, { name = name, count = count })
-          end
+         -- Cache this item as belonging to this tag for future use
+         if not cachedTagPresence[tag][name] then
+             cachedTagPresence[tag][name] = true
+             table.insert(cachedTagLookup[tag], name)
+             saveCachedTags()
+         end
+         
+         -- Check if we actually have it
+         local count = loaded.inventory.interface.getCount(name)
+         if count > 0 then
+             table.insert(itemsWithTagsCount, { name = name, count = count })
+         end
       end
       
       -- Sort by count to use most abundant item
@@ -360,10 +360,36 @@ return {
       return true, name
     end
 
+    -- FIX: Select the best item from a list of options (instead of blindly picking the first)
     local function selectBestFromList(list)
       common.enforceType(list, 1, "integer[]")
-      local itemInfo = itemLookup[list[1]]
-      return true, (itemInfo.name or itemInfo[1])
+      
+      -- Try to find one we already have
+      for _, itemIndex in ipairs(list) do
+          local itemInfo = itemLookup[itemIndex]
+          local name = itemInfo.name or itemInfo[1]
+          if getCount(name) > 0 then
+              return true, name
+          end
+      end
+
+      -- Try to find one we can craft
+      local craftableList = listCraftables()
+      local isCraftableLUT = {}
+      for k, v in pairs(craftableList) do
+        isCraftableLUT[v] = true
+      end
+      for _, itemIndex in ipairs(list) do
+          local itemInfo = itemLookup[itemIndex]
+          local name = itemInfo.name or itemInfo[1]
+          if isCraftableLUT[name] then
+              return true, name
+          end
+      end
+      
+      -- Default to the first one if we can't find anything better
+      local firstInfo = itemLookup[list[1]]
+      return true, (firstInfo.name or firstInfo[1])
     end
 
     local function getBestItem(item)
