@@ -159,9 +159,6 @@ return {
     ---@type table<string,table<string,integer>> item name -> count reserved
     local reservedItems = {}
 
-    bfile.addAlias("string_uint16_map", "map<string,uint16>")
-    bfile.newStruct("reserved_items"):add("map<string,string_uint16_map>", "^")
-
     local function saveReservedItems()
       if not config.crafting.persistence.value then
         return

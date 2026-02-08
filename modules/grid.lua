@@ -50,15 +50,13 @@ return {
     ---@param recipe GridRecipe
     local function cacheAdditional(recipe)
       recipe.requires = {}
-      for k, v in ipairs(recipe) do
+      for k, v in ipairs(recipe.recipe) do
         if recipe.shaped then
-          for row, i in ipairs(v) do
-            local old = recipe.requires[i]
-            recipe.requires[i] = (old or 0) + 1
-          end
+          local old = recipe.requires[v]
+          recipe.requires[v] = (old or 0) + 1
         else
-          local i = recipe.requires[v]
-          recipe.requires[v] = (i or 0) + 1
+          local old = recipe.requires[v]
+          recipe.requires[v] = (old or 0) + 1
         end
       end
     end
@@ -455,7 +453,6 @@ return {
       cacheAdditional(recipe)
       recipe.name = recipeName
       gridRecipes[recipeName] = recipe
-      saveGridRecipes()
     end
     crafting.addJsonTypeHandler("minecraft:crafting_shaped", jsonTypeHandler)
     crafting.addJsonTypeHandler("minecraft:crafting_shapeless", jsonTypeHandler)
