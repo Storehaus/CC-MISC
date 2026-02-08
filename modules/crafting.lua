@@ -3,7 +3,7 @@ local common = require("common")
 ---@field interface modules.crafting.interface
 return {
   id = "crafting",
-  version = "1.4.7", -- Bumped version for fix
+  version = "1.4.8", -- Bumped version for fix
   config = {
     tagLookup = {
       type = "table",
@@ -388,10 +388,20 @@ return {
     local function selectBestFromList(list)
       common.enforceType(list, 1, "integer[]")
       
+      -- 1. Check if we have any of these items directly in inventory
       for _, itemIndex in ipairs(list) do
           local itemInfo = itemLookup[itemIndex]
           local name = itemInfo.name or itemInfo[1]
-          if getCount(name) > 0 then
+          
+          -- If the list entry is a TAG, try to resolve it to an item we have
+          if itemInfo.tag then
+             local tagStr = name
+             if not tagStr:find("^#") then tagStr = "#" .. tagStr end
+             local success, resolved = selectBestFromTag(tagStr)
+             if success and getCount(resolved) > 0 then
+                 return true, resolved
+             end
+          elseif getCount(name) > 0 then
               return true, name
           end
       end
@@ -406,7 +416,16 @@ return {
       for _, itemIndex in ipairs(list) do
           local itemInfo = itemLookup[itemIndex]
           local name = itemInfo.name or itemInfo[1]
-          if isCraftableLUT[name] then
+          
+          if itemInfo.tag then
+             -- Resolve tag to a specific item for crafting check
+             local tagStr = name
+             if not tagStr:find("^#") then tagStr = "#" .. tagStr end
+             local success, resolved = selectBestFromTag(tagStr)
+             if success then
+                 table.insert(craftableCandidates, resolved)
+             end
+          elseif isCraftableLUT[name] then
               table.insert(craftableCandidates, name)
           end
       end
