@@ -217,14 +217,6 @@ return {
       return id
     end
 
-    local function waitForTransfer(id)
-      local e
-      repeat
-        e = { os.pullEvent("inventoryFinished") }
-      until e[2] == id
-      return e
-    end
-
     ---Push items to an inventory
     ---@param async boolean|nil
     ---@param targetInventory string|AbstractInventory|Inventory
