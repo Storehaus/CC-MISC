@@ -49,7 +49,6 @@ end
 local craftInstall = {
   name = "Crafting Modules",
   files = {
-    ["bfile.lua"] = fromRepository "bfile.lua",
     ["lib/json.lua"] = fromRepository "lib/json.lua",
     modules = {
       ["crafting.lua"] = fromRepository "modules/crafting.lua",
