@@ -53,7 +53,7 @@ return {
     ---@type table<string,ItemIndex> lookup from name -> item_lookup index
     local itemNameLookup = {}
 
-    local json = require("json")
+    local json = require("lib/json")
     local function saveItemLookup()
       local f = assert(fs.open("recipes/item_lookup.json", "w"))
       f.write(json.encode(itemLookup))

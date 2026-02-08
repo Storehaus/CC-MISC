@@ -1,5 +1,6 @@
 --- Grid crafting recipe handler
 local common = require("common")
+local json = require("lib/json")
 ---@class modules.grid
 return {
   id = "grid",

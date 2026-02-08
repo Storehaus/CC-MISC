@@ -1,5 +1,6 @@
 --- Furnace crafting recipe handler
 -- 2 laptops from an AI cluster were sacrificed in fixing of this code
+local json = require("lib/json")
 ---@class modules.furnace
 return {
     id = "furnace",
