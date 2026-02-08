@@ -56,9 +56,7 @@ local craftInstall = {
       ["grid.lua"] = fromRepository "modules/grid.lua",
     },
     recipes = {
-      ["grid_recipes.bin"] = fromRepository "recipes/grid_recipes.bin",
-      ["item_lookup.bin"] = fromRepository "recipes/item_lookup.bin",
-      ["furnace_recipes.bin"] = fromRepository "recipes/furnace_recipes.bin",
+      ["recipes.json"] = fromRepository "recipes/recipes.json",
     }
   }
 }
