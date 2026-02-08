@@ -217,6 +217,14 @@ return {
       return id
     end
 
+    local function waitForTransfer(id)
+      local e
+      repeat
+        e = { os.pullEvent("inventoryFinished") }
+      until e[2] == id
+      return e
+    end
+
     ---Push items to an inventory
     ---@param async boolean|nil
     ---@param targetInventory string|AbstractInventory|Inventory
@@ -231,14 +239,6 @@ return {
         return queueAction("pushItems", targetInventory, name, amount, toSlot, nbt, options)
       end
       performTransfer()
-      
-      -- WORKAROUND: Split exactly 64 into two moves to bypass the library bug
-      if amount == 64 or amount == 16 then
-          local first = storage.pushItems(targetInventory, name, amount-1, toSlot, nbt, options)
-          local second = storage.pushItems(targetInventory, name, 1, toSlot, nbt, options)
-          return first + second
-      end
-      
       return storage.pushItems(targetInventory, name, amount, toSlot, nbt, options)
     end
 
