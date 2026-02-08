@@ -27,9 +27,6 @@ return {
         ---@type table<string,string> output->input
         local recipes = {}
 
-        local bfile = require("bfile")
-        local structFurnaceRecipe = bfile.newStruct("furnace_recipe"):add("string", "output"):add("uint16", "input")
-
         local function updateCraftableList()
             local list = {}
             for k, v in pairs(recipes) do
@@ -38,32 +35,19 @@ return {
             crafting.addCraftableList("furnace", list)
         end
 
-        local function saveFurnaceRecipes()
-            local f = assert(fs.open("recipes/furnace_recipes.bin", "wb"))
-            f.write("FURNACE0") -- "versioned"
-            for k, v in pairs(recipes) do
-                structFurnaceRecipe:writeHandle(f, {
-                    input = crafting.getOrCacheString(v),
-                    output = k
-                })
-            end
-            f.close()
-            updateCraftableList()
-        end
-
         local function loadFurnaceRecipes()
-            local f = fs.open("recipes/furnace_recipes.bin", "rb")
-            if not f then
-                recipes = {}
-                return
+            local f = fs.open("recipes/recipes.json", "r")
+            if f then
+                local json = textutils.unserialiseJSON(f.readAll() or "{}")
+                f.close()
+                if json.recipes and json.recipes.furnace then
+                    for _, recipe in ipairs(json.recipes.furnace) do
+                        if recipe.type == "minecraft:smelting" then
+                            recipes[recipe.result] = recipe.ingredient
+                        end
+                    end
+                end
             end
-            assert(f.read(8) == "FURNACE0", "Invalid furnace recipe file.")
-            while f.read(1) do
-                f.seek(nil, -1)
-                local recipeInfo = structFurnaceRecipe:readHandle(f)
-                _, recipes[recipeInfo.output] = crafting.getBestItem(recipeInfo.input)
-            end
-            f.close()
             updateCraftableList()
         end
 
@@ -71,7 +55,7 @@ return {
             local input = json.ingredient.item
             local output = json.result
             recipes[output] = input
-            saveFurnaceRecipes()
+            updateCraftableList()
         end
         crafting.addJsonTypeHandler("minecraft:smelting", jsonTypeHandler)
 

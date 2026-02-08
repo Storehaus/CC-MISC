@@ -62,54 +62,6 @@ return {
       end
     end
 
-    local bfile = require("bfile")
-    bfile.newStruct("grid_recipe_shaped"):add("uint8", "produces"):add("string", "name"):add("uint8", "width"):add(
-      "uint8", "height")
-    bfile.newStruct("grid_recipe_unshaped"):add("uint8", "produces"):add("string", "name"):add("uint8", "length")
-    bfile.addType("grid_recipe_part", function(f)
-      local ch = f.read(1)
-      if ch == "S" then
-        return bfile.getReader("uint16")(f)
-      elseif ch == "A" then
-        return bfile.getReader("uint16[uint8]")(f)
-      end
-      error("Grid recipe parse error")
-    end, function(f, value)
-      if type(value) == "table" then
-        f.write("A")
-        bfile.getWriter("uint16[uint8]")(f, value)
-        return
-      end
-      f.write("S")
-      bfile.getWriter("uint16")(f, value)
-    end)
-    bfile.newStruct("grid_recipe"):conditional("^", function(ch)
-      if ch == "S" then
-        return "grid_recipe_shaped"
-      elseif ch == "U" then
-        return "grid_recipe_unshaped"
-      end
-      error("Grid recipe parse error")
-    end, function(value)
-      if value.shaped then
-        return "S", "grid_recipe_shaped"
-      end
-      return "U", "grid_recipe_unshaped"
-    end)
-
-    ---Save the grid recipes to a file
-    local function saveGridRecipes()
-      local f = assert(fs.open("recipes/grid_recipes.bin", "wb"))
-      f.write("GRECIPES")
-      for k, v in pairs(gridRecipes) do
-        bfile.getStruct("grid_recipe"):writeHandle(f, v)
-        for _, i in ipairs(v.recipe) do
-          bfile.getWriter("grid_recipe_part")(f, i)
-        end
-      end
-      f.close()
-    end
-
     local function updateCraftableList()
       local list = {}
       for k, v in pairs(gridRecipes) do
@@ -148,7 +100,6 @@ return {
       end
       gridRecipes[name] = gridRecipe
       cacheAdditional(gridRecipe)
-      saveGridRecipes()
       updateCraftableList()
     end
 
@@ -161,34 +112,72 @@ return {
         gridRecipes[name] = nil
         return true
       end
-      saveGridRecipes()
+      updateCraftableList()
       return false
     end
 
     ---Load the grid recipes from a file
     local function loadGridRecipes()
-      local f = fs.open("recipes/grid_recipes.bin", "rb")
-      if not f then
-        gridRecipes = {}
-        updateCraftableList()
-        return
-      end
-      assert(f.read(8) == "GRECIPES", "Invalid grid recipe file.")
-      local shapeIndicator = f.read(1)
-      while shapeIndicator do
-        f.seek(nil, -1)
-        local recipe = bfile.getStruct("grid_recipe"):readHandle(f)
-        recipe.shaped = not recipe.length
-        recipe.recipe = {}
-        for i = 1, recipe.length or (recipe.width * recipe.height) do
-          recipe.recipe[i] = bfile.getReader("grid_recipe_part")(f)
+      local f = fs.open("recipes/recipes.json", "r")
+      if f then
+        local json = textutils.unserialiseJSON(f.readAll() or "{}")
+        f.close()
+        if json.recipes and json.recipes.crafting then
+          for _, recipe in ipairs(json.recipes.crafting) do
+            if recipe.type == "minecraft:crafting_shaped" or recipe.type == "minecraft:crafting_shapeless" then
+              local recipeName = recipe.result.item
+              local gridRecipe = {}
+              gridRecipe.shaped = recipe.type == "minecraft:crafting_shaped"
+              gridRecipe.produces = recipe.result.count or 1
+              gridRecipe.name = recipeName
+              gridRecipe.recipe = {}
+              if gridRecipe.shaped then
+                gridRecipe.width = recipe.pattern[1]:len()
+                gridRecipe.height = #recipe.pattern
+                local keys = { [" "] = 0 }
+                for k, v in pairs(recipe.key) do
+                  local name = v.item or v.tag
+                  local isTag = not not v.tag
+                  if not (name) then
+                    local array = {}
+                    for _, opt in pairs(v) do
+                      name = opt.item or opt.tag
+                      table.insert(array, crafting.getOrCacheString(name, isTag))
+                    end
+                    keys[k] = array
+                  else
+                    keys[k] = crafting.getOrCacheString(name, isTag)
+                  end
+                end
+                for row, rowString in ipairs(recipe.pattern) do
+                  for i = 1, rowString:len() do
+                    table.insert(gridRecipe.recipe, keys[rowString:sub(i, i)])
+                  end
+                end
+              else
+                gridRecipe.length = #recipe.ingredients
+                for _, v in ipairs(recipe.ingredients) do
+                  local name = v.item or v.tag
+                  local isTag = not not v.tag
+                  if not (name) then
+                    local array = {}
+                    for _, opt in pairs(v) do
+                      name = opt.item or opt.tag
+                      table.insert(array, crafting.getOrCacheString(name, isTag))
+                    end
+                    table.insert(gridRecipe.recipe, array)
+                  else
+                    table.insert(gridRecipe.recipe, crafting.getOrCacheString(name, isTag))
+                  end
+                end
+              end
+              cacheAdditional(gridRecipe)
+              gridRecipes[recipeName] = gridRecipe
+            end
+          end
         end
-        gridRecipes[recipe.name] = recipe
-        cacheAdditional(recipe)
-        shapeIndicator = f.read(1)
       end
       updateCraftableList()
-      f.close()
     end
 
 

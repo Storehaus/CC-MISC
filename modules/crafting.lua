@@ -53,29 +53,20 @@ return {
     ---@type table<string,ItemIndex> lookup from name -> item_lookup index
     local itemNameLookup = {}
 
-    local bfile = require("bfile")
-    bfile.addType("tag_boolean", function(f)
-      if f.read(1) == "T" then
-        return true
-      end
-      return false
-    end, function(f, v)
-      if v then
-        f.write("T")
-      else
-        f.write("I")
-      end
-    end)
-    bfile.newStruct("item_lookup_entry"):add("tag_boolean", "tag"):add("string", 1)
-    bfile.newStruct("item_lookup"):constant("ILUT"):add("item_lookup_entry[*]", "^")
-
+    local json = require("json")
     local function saveItemLookup()
-      bfile.getStruct("item_lookup"):writeFile("recipes/item_lookup.bin", itemLookup)
+      local f = assert(fs.open("recipes/item_lookup.json", "w"))
+      f.write(json.encode(itemLookup))
+      f.close()
     end
     local function loadItemLookup()
-      itemLookup = bfile.getStruct("item_lookup"):readFile("recipes/item_lookup.bin") or {}
-      for k, v in pairs(itemLookup) do
-        itemNameLookup[v[1]] = k
+      local f = fs.open("recipes/item_lookup.json", "r")
+      if f then
+        itemLookup = json.decode(f.readAll() or "{}")
+        f.close()
+        for k, v in pairs(itemLookup) do
+          itemNameLookup[v[1]] = k
+        end
       end
     end
 
@@ -286,25 +277,29 @@ return {
       return l
     end
 
-    bfile.newStruct("cached_tags"):add("map<string,string[uint16]>", "^")
-
     ---@type table<string,string[]> tag -> item names
     local cachedTagLookup = {}
 
     local function saveCachedTags()
-      bfile.getStruct("cached_tags"):writeFile(".cache/cached_tags.bin", cachedTagLookup)
+      local f = assert(fs.open(".cache/cached_tags.json", "w"))
+      f.write(json.encode(cachedTagLookup))
+      f.close()
     end
 
     ---@type table<string,table<string,boolean>> tag -> item name -> is it in cached_tag_lookup
     local cachedTagPresence = {}
 
     local function loadCachedTags()
-      cachedTagLookup = bfile.getStruct("cached_tags"):readFile(".cache/cached_tags.bin") or {}
-      cachedTagPresence = {}
-      for tag, names in pairs(cachedTagLookup) do
-        cachedTagPresence[tag] = {}
-        for _, name in ipairs(names) do
-          cachedTagPresence[tag][name] = true
+      local f = fs.open(".cache/cached_tags.json", "r")
+      if f then
+        cachedTagLookup = json.decode(f.readAll() or "{}")
+        f.close()
+        cachedTagPresence = {}
+        for tag, names in pairs(cachedTagLookup) do
+          cachedTagPresence[tag] = {}
+          for _, name in ipairs(names) do
+            cachedTagPresence[tag][name] = true
+          end
         end
       end
     end
@@ -454,8 +449,8 @@ return {
           end
         end
       end
-      local f = assert(fs.open(".cache/flat_task_lookup.bin", "wb"))
-      f.write(bfile.serialise(flatTaskLookup))
+      local f = assert(fs.open(".cache/flat_task_lookup.json", "w"))
+      f.write(json.encode(flatTaskLookup))
       f.close()
     end
 
@@ -473,9 +468,9 @@ return {
       if log then
         taskLoaderLogger = log.interface.logger("crafting", "loadTaskLookup")
       end
-      local f = fs.open(".cache/flat_task_lookup.bin", "rb")
+      local f = fs.open(".cache/flat_task_lookup.json", "r")
       if f then
-        taskLookup = bfile.unserialise(f.readAll() or "")
+        taskLookup = json.decode(f.readAll() or "{}")
         f.close()
       else
         taskLookup = {}
@@ -885,8 +880,8 @@ return {
         end)
         flatPendingJobs[jobIndex] = clone
       end
-      local f = assert(fs.open(".cache/pending_jobs.bin", "wb"))
-      f.write(bfile.serialise(flatPendingJobs))
+      local f = assert(fs.open(".cache/pending_jobs.json", "w"))
+      f.write(json.encode(flatPendingJobs))
       f.close()
     end
 
@@ -895,9 +890,9 @@ return {
         pendingJobs = {}
         return
       end
-      local f = fs.open(".cache/pending_jobs.bin", "rb")
+      local f = fs.open(".cache/pending_jobs.json", "r")
       if f then
-        pendingJobs = bfile.unserialise(f.readAll() or "")
+        pendingJobs = json.decode(f.readAll() or "{}")
         f.close()
       else
         pendingJobs = {}
