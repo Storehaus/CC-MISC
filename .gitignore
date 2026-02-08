@@ -4,9 +4,10 @@ log.txt
 config.lua
 basalt.lua
 stone.json
+server.jar
 
 # Jekyll junk files
 .jekyll-metadata
 .jekyll-cache/
 _site/
-server.jar
+

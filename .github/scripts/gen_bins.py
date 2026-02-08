@@ -4,6 +4,67 @@ import struct
 import os
 import io
 
+def process_tags(zip_obj, tags_map):
+    # Scan for item tags
+    # Path format in jar: data/<namespace>/tags/item/<name>.json
+    tag_files = [f for f in zip_obj.namelist() if '/tags/item/' in f and f.endswith('.json')]
+    
+    # First pass: Load all raw tags
+    raw_tags = {}
+    
+    for file_path in tag_files:
+        try:
+            with zip_obj.open(file_path) as file:
+                data = json.load(file)
+                
+                # Derive tag name from path
+                # data/minecraft/tags/item/logs.json -> minecraft:logs
+                parts = file_path.split('/')
+                # parts usually: ['data', 'minecraft', 'tags', 'item', 'logs.json']
+                if len(parts) >= 5:
+                    namespace = parts[1]
+                    name = os.path.splitext(parts[-1])[0]
+                    tag_key = f"{namespace}:{name}" # e.g. "minecraft:logs"
+                    # Add # prefix to match how recipe inputs look
+                    full_key = f"#{tag_key}" 
+                    
+                    values = []
+                    raw_values = data.get("values", [])
+                    for v in raw_values:
+                        if isinstance(v, str):
+                            values.append(v)
+                        elif isinstance(v, dict) and "id" in v:
+                            values.append(v["id"])
+                    
+                    raw_tags[full_key] = values
+        except Exception:
+            continue
+
+    # Second pass: Resolve tags within tags (basic flattening)
+    # We loop a few times to resolve nested tags like #minecraft:logs containing #minecraft:oak_logs
+    for _ in range(3): 
+        for tag, values in raw_tags.items():
+            new_values = []
+            for v in values:
+                if v.startswith('#'):
+                    # It's a reference to another tag, expand it if we know it
+                    if v in raw_tags:
+                        new_values.extend(raw_tags[v])
+                    else:
+                        new_values.append(v) # Keep it if we can't resolve it
+                else:
+                    new_values.append(v)
+            # Remove duplicates
+            raw_tags[tag] = list(set(new_values))
+
+    # Copy to the output map
+    for k, v in raw_tags.items():
+        # Remove the # prefix for the key in the aliases table if preferred, 
+        # but keeping it makes lookup easier for exact matches on inputs like "#minecraft:logs"
+        tags_map[k] = v
+
+    return len(raw_tags)
+
 def process_recipes(zip_obj, furnace_list, crafting_set, crafting_recipes):
     # 1.21 changed folder from 'recipes' to 'recipe'
     recipe_files = [f for f in zip_obj.namelist() if f.startswith('data/minecraft/recipe/') and f.endswith('.json')]
@@ -20,7 +81,15 @@ def process_recipes(zip_obj, furnace_list, crafting_set, crafting_recipes):
                     # Handle 1.21 list or single string/dict
                     if isinstance(ing, list): ing = ing[0]
                     item_in = ing if isinstance(ing, str) else ing.get("item") or ing.get("tag")
+                    # Ensure tags start with #
+                    if item_in and not item_in.startswith('#') and ':' in item_in and not item_in.startswith('minecraft:'): 
+                         # Heuristic: if it's a tag in the json but just a string here, we might miss the #
+                         # But standard JSON reader usually sees "tag": "minecraft:logs"
+                         pass
                     
+                    if isinstance(ing, dict) and "tag" in ing:
+                        item_in = "#" + ing["tag"]
+
                     # 1.21 result uses 'id' instead of 'item'
                     res = data.get("result")
                     item_out = res if isinstance(res, str) else res.get("id") or res.get("item")
@@ -58,20 +127,12 @@ def process_recipes(zip_obj, furnace_list, crafting_set, crafting_recipes):
             continue
     return count
 
-def get_item_index(item_name, crafting_items):
-    # Create a mapping of item names to indices
-    item_index = 1
-    item_index_map = {}
-    for item in sorted(list(crafting_items)):
-        item_index_map[item] = item_index
-        item_index += 1
-    return item_index_map.get(item_name, 1)  # Default to 1 if not found
-
 def generate_bins():
     jar_path = "server.jar"
     furnace_data = []
     crafting_items = set()
     crafting_recipes = []
+    tags_map = {}
 
     if not os.path.exists(jar_path):
         print("server.jar not found.")
@@ -87,12 +148,14 @@ def generate_bins():
                     inner_data = io.BytesIO(inner_file.read())
                     with zipfile.ZipFile(inner_data) as inner_zip:
                         process_recipes(inner_zip, furnace_data, crafting_items, crafting_recipes)
+                        process_tags(inner_zip, tags_map)
                 is_bundler = True
                 break
         
         # If not a bundler, try the root
         if not is_bundler:
             process_recipes(outer_zip, furnace_data, crafting_items, crafting_recipes)
+            process_tags(outer_zip, tags_map)
 
     # Create unified JSON structure
     recipes = {
@@ -100,7 +163,8 @@ def generate_bins():
             "furnace": [],
             "crafting": []
         },
-        "itemLookup": {}
+        "itemLookup": {},
+        "aliases": tags_map # Add the aliases/tags table here
     }
 
     # Add furnace recipes
@@ -124,11 +188,17 @@ def generate_bins():
         item_index += 1
 
     # Write to JSON file
+    if not os.path.exists("recipes"):
+        os.makedirs("recipes")
+        
     with open("recipes/recipes.json", "w") as f:
         json.dump(recipes, f, indent=2)
 
     print(f"Success! Generated JSON:")
-    print(f" - recipes.json: {len(furnace_data)} furnace recipes, {len(crafting_recipes)} crafting recipes, {len(crafting_items)} items")
+    print(f" - {len(tags_map)} tags/aliases processed")
+    print(f" - {len(furnace_data)} furnace recipes")
+    print(f" - {len(crafting_recipes)} crafting recipes")
+    print(f" - {len(crafting_items)} items")
 
 if __name__ == "__main__":
     generate_bins()
