@@ -3,6 +3,46 @@ import json
 import struct
 import os
 import io
+import urllib.request
+
+def download_latest_server():
+    print("Locating latest Minecraft server jar...")
+    manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+    
+    try:
+        # 1. Fetch version manifest to find the latest version ID
+        with urllib.request.urlopen(manifest_url) as response:
+            manifest = json.loads(response.read().decode('utf-8'))
+        
+        latest_version = manifest['latest']['release']
+        print(f"Latest release version: {latest_version}")
+        
+        # 2. Find the URL for the specific version package JSON
+        version_url = None
+        for version in manifest['versions']:
+            if version['id'] == latest_version:
+                version_url = version['url']
+                break
+                
+        if not version_url:
+            print("Error: Could not find version details.")
+            return False
+
+        # 3. Fetch version details to get the actual download link
+        with urllib.request.urlopen(version_url) as response:
+            version_data = json.loads(response.read().decode('utf-8'))
+            
+        server_url = version_data['downloads']['server']['url']
+        print(f"Downloading server.jar from {server_url}...")
+        
+        # 4. Download the file
+        urllib.request.urlretrieve(server_url, "server.jar")
+        print("Download complete!")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to download server.jar: {e}")
+        return False
 
 def process_tags(zip_obj, tags_map):
     # Scan for item tags
@@ -128,6 +168,11 @@ def process_recipes(zip_obj, furnace_list, crafting_set, crafting_recipes):
     return count
 
 def generate_bins():
+    # Automatically download the latest server jar
+    if not download_latest_server():
+        print("Aborting generation due to download failure.")
+        return
+
     jar_path = "server.jar"
     furnace_data = []
     crafting_items = set()
