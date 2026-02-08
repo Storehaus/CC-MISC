@@ -62,10 +62,16 @@ return {
     local function loadItemLookup()
       local f = fs.open("recipes/item_lookup.json", "r")
       if f then
-        itemLookup = json.decode(f.readAll() or "{}")
+        local contents = f.readAll() or "{}"
         f.close()
-        for k, v in pairs(itemLookup) do
-          itemNameLookup[v[1]] = k
+        local decoded = json.decode(contents)
+        if type(decoded) == "table" then
+          itemLookup = decoded
+          for k, v in pairs(itemLookup) do
+            itemNameLookup[v[1]] = k
+          end
+        else
+          print("Warning: Invalid item lookup JSON format")
         end
       end
     end
@@ -470,15 +476,22 @@ return {
       end
       local f = fs.open(".cache/flat_task_lookup.json", "r")
       if f then
-        taskLookup = json.decode(f.readAll() or "{}")
+        local contents = f.readAll() or "{}"
         f.close()
+        local decoded = json.decode(contents)
+        if type(decoded) == "table" then
+          taskLookup = decoded
+        else
+          taskLookup = {}
+          print("Warning: Invalid task lookup JSON format")
+        end
       else
         taskLookup = {}
       end
       jobLookup = {}
-      waitingQueue = {}
-      readyQueue = {}
-      craftingQueue = {}
+      waitingQueue = []
+      readyQueue = []
+      craftingQueue = []
       doneLookup = {}
       for k, v in pairs(taskLookup) do
         taskLoaderLogger:debug("Loaded taskId=%s,state=%s", v.taskId, v.state)
@@ -892,8 +905,15 @@ return {
       end
       local f = fs.open(".cache/pending_jobs.json", "r")
       if f then
-        pendingJobs = json.decode(f.readAll() or "{}")
+        local contents = f.readAll() or "{}"
         f.close()
+        local decoded = json.decode(contents)
+        if type(decoded) == "table" then
+          pendingJobs = decoded
+        else
+          pendingJobs = {}
+          print("Warning: Invalid pending jobs JSON format")
+        end
       else
         pendingJobs = {}
       end
@@ -1237,7 +1257,7 @@ return {
         local e, transfer = os.pullEvent("file_transfer")
         for _, file in ipairs(transfer.getFiles()) do
           local contents = file.readAll()
-          local json = textutils.unserialiseJSON(contents)
+          local json = json.decode(contents)
           if type(json) == "table" then
             if loadJson(json) then
               print(("Successfully imported %s"):format(file.getName()))

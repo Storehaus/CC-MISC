@@ -103,6 +103,7 @@ local baseInstall = {
     ["startup.lua"] = fromRepository "storage.lua",
     ["abstractInvLib.lua"] = fromRepository "lib/abstractInvLib.lua",
     ["common.lua"] = fromRepository "common.lua",
+    ["json.lua"] = fromRepository "lib/json.lua",
     modules = {
       ["inventory.lua"] = fromRepository "modules/inventory.lua",
       ["interface.lua"] = fromRepository "modules/interface.lua",

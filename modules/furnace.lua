@@ -38,10 +38,11 @@ return {
         local function loadFurnaceRecipes()
             local f = fs.open("recipes/recipes.json", "r")
             if f then
-                local json = textutils.unserialiseJSON(f.readAll() or "{}")
+                local contents = f.readAll() or "{}"
                 f.close()
-                if json.recipes and json.recipes.furnace then
-                    for _, recipe in ipairs(json.recipes.furnace) do
+                local decoded = json.decode(contents)
+                if type(decoded) == "table" and decoded.recipes and decoded.recipes.furnace then
+                    for _, recipe in ipairs(decoded.recipes.furnace) do
                         if recipe.type == "minecraft:smelting" then
                             recipes[recipe.result] = recipe.ingredient
                         end

@@ -120,10 +120,11 @@ return {
     local function loadGridRecipes()
       local f = fs.open("recipes/recipes.json", "r")
       if f then
-        local json = textutils.unserialiseJSON(f.readAll() or "{}")
+        local contents = f.readAll() or "{}"
         f.close()
-        if json.recipes and json.recipes.crafting then
-          for _, recipe in ipairs(json.recipes.crafting) do
+        local decoded = json.decode(contents)
+        if type(decoded) == "table" and decoded.recipes and decoded.recipes.crafting then
+          for _, recipe in ipairs(decoded.recipes.crafting) do
             if recipe.type == "minecraft:crafting_shaped" or recipe.type == "minecraft:crafting_shapeless" then
               local recipeName = recipe.result.item
               local gridRecipe = {}
