@@ -75,18 +75,27 @@ return {
         ---@param count integer
         ---@return boolean success
         local function directDisposalHandler(name, count)
-            disposalLogger:info("Using direct disposal for %u %s(s)", count, name)
+            -- RE-VERIFY: Check current stock right before pushing
+            local currentCount = inventory.getCount(name)
+            local threshold = disposalThresholds[name] or 0
+            
+            -- Ensure we don't try to move more than exists or dip below threshold
+            local safeCount = math.min(count, currentCount - threshold)
 
-            -- Try to find a disposal inventory using the configured patterns
+            if safeCount <= 0 then
+                disposalLogger:debug("Aborting disposal for %s: count changed during execution", name)
+                return false
+            end
+
+            disposalLogger:info("Using direct disposal for %u %s(s)", safeCount, name)
+
             local disposalInv = nil
             local patterns = config.disposal.disposalPatterns.value
-            disposalLogger:debug("Looking for disposal inventories with patterns: %s", table.concat(patterns, ", "))
 
             for _, invName in pairs(getAttachedInventories()) do
                 for _, pattern in ipairs(patterns) do
                     if invName:find(pattern) then
                         disposalInv = invName
-                        disposalLogger:info("Found disposal inventory: %s (matched pattern: %s)", invName, pattern)
                         break
                     end
                 end
@@ -94,20 +103,18 @@ return {
             end
 
             if not disposalInv then
-                disposalLogger:warn("No disposal inventory found matching any patterns: %s", table.concat(patterns, ", "))
+                disposalLogger:warn("No disposal inventory found matching patterns")
                 return false
             end
 
-            -- Push items directly from abstract storage to the disposal inventory
-            -- storage is the abstractInvLib instance behind inventory.interface
-            local pushed = inventory.pushItems(false, disposalInv, name, count)
+            -- Use the safeCount instead of the original count
+            local pushed = inventory.pushItems(false, disposalInv, name, safeCount)
 
             if pushed > 0 then
                 disposalLogger:info("Disposed %u %s(s) to %s", pushed, name, disposalInv)
                 return true
             end
 
-            disposalLogger:warn("Direct disposal failed for %u %s(s) (nothing pushed)", count, name)
             return false
         end
 
@@ -153,8 +160,11 @@ return {
             for item, threshold in pairs(disposalThresholds) do
                 local shouldDispose, excessCount = shouldDisposeItem(item)
                 if shouldDispose then
-                    disposalLogger:info("Found %u excess %s(s) to dispose (threshold: %u)", excessCount, item, threshold)
-                    requestDisposal(item, excessCount)
+                    -- pcall prevents the module from crashing if the library throws an error
+                    local ok, err = pcall(requestDisposal, item, excessCount)
+                    if not ok then
+                        disposalLogger:error("Error during disposal of %s: %s", item, err)
+                    end
                 end
             end
         end

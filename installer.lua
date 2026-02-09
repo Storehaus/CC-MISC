@@ -26,6 +26,7 @@ elseif args[1] and args[1]:match("^[%w_-]+/[%w_-]+$") then
         local chunk = load(installerCode, "installer", "t", _ENV)
         if chunk then
             chunk(unpack(newArgs))
+            return -- [[ FIXED: Stop this script so we don't run the default menu after the child finishes ]]
         else
             print("Error: Failed to load installer from target repository")
             print("Falling back to default repository")
@@ -49,16 +50,14 @@ end
 local craftInstall = {
   name = "Crafting Modules",
   files = {
-    ["bfile.lua"] = fromRepository "bfile.lua",
+    ["lib/json.lua"] = fromRepository "lib/json.lua",
     modules = {
       ["crafting.lua"] = fromRepository "modules/crafting.lua",
       ["furnace.lua"] = fromRepository "modules/furnace.lua",
       ["grid.lua"] = fromRepository "modules/grid.lua",
     },
     recipes = {
-      ["grid_recipes.bin"] = fromRepository "recipes/grid_recipes.bin",
-      ["item_lookup.bin"] = fromRepository "recipes/item_lookup.bin",
-      ["furnace_recipes.bin"] = fromRepository "recipes/furnace_recipes.bin",
+      ["recipes.json"] = fromRepository "recipes/recipes.json",
     }
   }
 }
@@ -105,6 +104,7 @@ local baseInstall = {
     ["startup.lua"] = fromRepository "storage.lua",
     ["abstractInvLib.lua"] = fromRepository "lib/abstractInvLib.lua",
     ["common.lua"] = fromRepository "common.lua",
+    ["json.lua"] = fromRepository "lib/json.lua",
     modules = {
       ["inventory.lua"] = fromRepository "modules/inventory.lua",
       ["interface.lua"] = fromRepository "modules/interface.lua",
@@ -287,4 +287,22 @@ local function processOptions(options)
   end
 end
 
-processOptions(installOptions)
+-- [[ UPDATED: Main Loop for Post-Install Actions ]]
+while true do
+  processOptions(installOptions)
+  
+  print("\nInstallation complete.")
+  write("Would you like to [R]eboot or [I]nstall more components? ")
+  local input = read()
+  local char = input and input:sub(1, 1):lower() or ""
+
+  if char == "r" then
+    os.reboot()
+  elseif char == "i" then
+    -- Just loop around. The repositoryUrl is preserved because we are still
+    -- in the same script execution instance.
+  else
+    print("\nExiting installer.")
+    break
+  end
+end
